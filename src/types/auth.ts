@@ -1,9 +1,11 @@
 // src/types/auth.ts
+
 export interface User {
   id: string;
   email: string;
   fullName: string;
   role: string;
+  department?: string; // new: department from JWT / backend
 }
 
 export interface LoginResponse {

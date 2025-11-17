@@ -8,8 +8,9 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
-import { employeeApi } from '@/lib/api';
+import { employeeApi, departmentApi } from '@/lib/api';
 import type { UpdateEmployeeInput, Employee } from '@/types/employee';
+import type { Department } from '@/types/department';
 
 export default function EditEmployee() {
   const router = useRouter();
@@ -22,36 +23,54 @@ export default function EditEmployee() {
   const [emp, setEmp] = useState<Employee | null>(null);
   const [form, setForm] = useState<UpdateEmployeeInput>({});
 
-  // state for reset password
+  // reset password
   const [newPassword, setNewPassword] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
-  // state for success popup
+  // success popup
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // departments for dropdown
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [depsLoading, setDepsLoading] = useState(true);
 
   function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value, type, checked } = e.target;
-    setForm({
-      ...form,
+    setForm((prev) => ({
+      ...prev,
       [name]: type === 'checkbox' ? checked : value,
-    });
+    }));
+  }
+
+  function onSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const { name, value } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   }
 
   useEffect(() => {
     (async () => {
       try {
-        const data = await employeeApi.one(id);
-        setEmp(data);
+        const [empData, deps] = await Promise.all([
+          employeeApi.one(id),
+          departmentApi.all(),
+        ]);
+
+        setEmp(empData);
         setForm({
-          employeeId: data.employeeId,
-          email: data.email,
-          fullName: data.fullName,
-          department: data.department,
-          position: data.position,
-          phoneNumber: data.phoneNumber,
-          isActive: data.isActive,
+          employeeId: empData.employeeId,
+          email: empData.email,
+          fullName: empData.fullName,
+          department: empData.department,
+          position: empData.position,
+          phoneNumber: empData.phoneNumber,
+          isActive: empData.isActive,
         });
+        setDepartments(deps);
       } finally {
+        setDepsLoading(false);
         setLoading(false);
       }
     })();
@@ -76,14 +95,13 @@ export default function EditEmployee() {
     e.preventDefault();
 
     if (!newPassword) {
-      // Could add nicer error popup here if desired
       return;
     }
 
     setResetLoading(true);
     try {
       await employeeApi.resetPassword(id, newPassword);
-      setShowSuccess(true); // Show success popup instead of alert
+      setShowSuccess(true);
       setNewPassword('');
     } catch (err: any) {
       alert(err?.response?.data?.message || 'Failed to reset password');
@@ -108,7 +126,7 @@ export default function EditEmployee() {
             <button
               onClick={() => {
                 setShowSuccess(false);
-                router.push('/employees'); // Close edit after popup
+                router.push('/employees');
               }}
               className="px-4 py-2 bg-blue-700 text-white rounded hover:bg-blue-800"
             >
@@ -142,12 +160,35 @@ export default function EditEmployee() {
               value={form.email || ''}
               onChange={onChange}
             />
-            <Input
-              label="Department"
-              name="department"
-              value={form.department || ''}
-              onChange={onChange}
-            />
+
+            {/* Department dropdown */}
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Department
+              </label>
+              {depsLoading ? (
+                <div className="text-sm text-gray-600">Loading departments...</div>
+              ) : departments.length === 0 ? (
+                <div className="text-sm text-gray-600">
+                  No departments found. Please create a department first.
+                </div>
+              ) : (
+                <select
+                  name="department"
+                  value={form.department || ''}
+                  onChange={onSelectChange}
+                  className="w-full border rounded h-10 px-3 text-sm"
+                >
+                  <option value="">Select department</option>
+                  {departments.map((d) => (
+                    <option key={d._id} value={d.name}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             <Input
               label="Position"
               name="position"

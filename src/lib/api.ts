@@ -56,15 +56,20 @@ export const departmentApi = {
     const { data } = await axios.get('/departments');
     return data;
   },
+
   create: async (input: CreateDepartmentInput): Promise<Department> => {
     const { data } = await axios.post('/departments', input);
     return data;
   },
+
   update: async (id: string, input: UpdateDepartmentInput): Promise<Department> => {
     const { data } = await axios.patch(`/departments/${id}`, input);
     return data;
   },
+
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/departments/${id}`);
   },
 };
+
+
