@@ -37,4 +37,11 @@ export const employeeApi = {
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/employees/${id}`);
   },
+
+  resetPassword: async (id: string, newPassword: string): Promise<Employee> => {
+    const { data } = await axios.patch(`/employees/${id}/reset-password`, {
+      newPassword,
+    });
+    return data;
+  },
 };
