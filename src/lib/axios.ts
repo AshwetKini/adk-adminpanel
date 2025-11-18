@@ -3,6 +3,8 @@ import axios from 'axios';
 import { getLocalAccess, getLocalRefresh, setLocalTokens, clearLocalTokens } from './tokens';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL;
+const tenantKey = process.env.NEXT_PUBLIC_TENANT_KEY;
+
 const axiosInstance = axios.create({
   baseURL: apiBase,
   timeout: 10000,
@@ -10,12 +12,14 @@ const axiosInstance = axios.create({
   withCredentials: true, // include cookies for refresh endpoint
 });
 
-// Attach access token
+// Attach access token and tenant key
 axiosInstance.interceptors.request.use((config) => {
   const token = getLocalAccess();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  if (tenantKey) config.headers['x-tenant-id'] = tenantKey;
   return config;
 });
+
 
 // Auto refresh on 401
 let isRefreshing = false;
