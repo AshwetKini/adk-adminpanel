@@ -36,9 +36,11 @@ const platformMenu: MenuItem[] = [
   { title: 'Tenants', href: '/tenants' },
 ];
 
+// UPDATED: employee sidebar menu, now includes Customers
 const employeeMenu: MenuItem[] = [
   { title: 'My Dashboard', href: '/employee/dashboard' },
   { title: 'My Department', href: '/employee/department' },
+  { title: 'Customers', href: '/employee/customers' }, // wire customer module here
 ];
 
 export default function Sidebar() {
@@ -59,7 +61,8 @@ export default function Sidebar() {
     }
   }, []);
 
-  const isPlatformAdmin = role === 'platform-admin' && tenantKey === 'platform';
+  const isPlatformAdmin =
+    role === 'platform-admin' && tenantKey === 'platform';
   const isEmployee = role === 'employee';
   const isTenantAdmin = role === 'superadmin' || role === 'admin';
 
@@ -69,7 +72,6 @@ export default function Sidebar() {
   } else if (isEmployee) {
     menu = employeeMenu;
   } else if (!isTenantAdmin && !isPlatformAdmin && !isEmployee) {
-    // Unknown role – default to a minimal menu
     menu = [{ title: 'Dashboard', href: '/dashboard' }];
   }
 
@@ -77,7 +79,7 @@ export default function Sidebar() {
     try {
       await fetch('/api/session', { method: 'DELETE' });
     } catch {
-      // ignore network errors here
+      // ignore
     }
 
     if (typeof window !== 'undefined') {

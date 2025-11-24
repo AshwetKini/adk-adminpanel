@@ -1,40 +1,71 @@
-// src/app/(dashboard)/departments/create/page.tsx
+// src/app/(dashboard)/departments/[id]/edit/page.tsx
 
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import type React from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
 import { departmentApi } from '@/lib/api';
-import type { CreateDepartmentInput } from '@/types/department';
+import type {
+  Department,
+  UpdateDepartmentInput,
+} from '@/types/department';
 
-// Keep in sync with backend Permission enum
 const PERMISSIONS = [
   {
     value: 'customer:reset-password',
     label: 'Customer: Reset Password',
-    description: 'Allow this department to reset passwords for any customer.',
+    description:
+      'Allow this department to reset passwords for any customer.',
   },
-  // You can add more permission options later:
-  // { value: 'customer:create', label: 'Customer: Create', description: '...' },
 ];
 
-export default function CreateDepartmentPage() {
+export default function EditDepartmentPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const params = useParams<{ id: string }>();
+  const id = params.id;
 
-  const [form, setForm] = useState<CreateDepartmentInput>({
-    name: '',
-    description: '',
-    permissions: [],
-  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+  const [dept, setDept] = useState<Department | null>(null);
+  const [form, setForm] = useState<UpdateDepartmentInput>({});
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const all = await departmentApi.all();
+        const found = all.find((d) => d._id === id); // <-- compare _id
+        setDept(found || null);
+
+        if (found) {
+          setForm({
+            name: found.name,
+            description: found.description,
+            isActive: found.isActive,
+            permissions: found.permissions || [],
+          });
+        }
+      } catch {
+        // ignore for now
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [id]);
+
+  function onChange(
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const { name, value, type, checked } = e.target;
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value,
+    }));
   }
 
   function togglePermission(value: string) {
@@ -56,27 +87,32 @@ export default function CreateDepartmentPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
+    if (!dept) return;
+    setSaving(true);
 
     try {
-      await departmentApi.create(form);
+      await departmentApi.update(dept._id, form); // <-- use _id
+      alert('Department updated successfully');
       router.push('/departments');
     } catch (err: any) {
       alert(
         err?.response?.data?.message ||
-          'Failed to create department',
+          'Failed to update department',
       );
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   }
+
+  if (loading) return <div>Loading...</div>;
+  if (!dept) return <div>Department not found</div>;
 
   const selectedPermissions = form.permissions || [];
 
   return (
     <div className="max-w-lg mx-auto py-8">
       <h1 className="text-2xl font-semibold mb-4">
-        Create Department
+        Edit Department
       </h1>
 
       <Card>
@@ -88,7 +124,7 @@ export default function CreateDepartmentPage() {
             <Input
               label="Department Name"
               name="name"
-              value={form.name}
+              value={form.name || ''}
               onChange={onChange}
             />
             <Input
@@ -98,7 +134,16 @@ export default function CreateDepartmentPage() {
               onChange={onChange}
             />
 
-            {/* Permissions */}
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="isActive"
+                checked={!!form.isActive}
+                onChange={onChange}
+              />
+              <span>Active</span>
+            </label>
+
             <div className="space-y-2">
               <div className="text-sm font-medium">
                 Permissions
@@ -121,7 +166,9 @@ export default function CreateDepartmentPage() {
                         type="checkbox"
                         className="mt-0.5 h-4 w-4"
                         checked={checked}
-                        onChange={() => togglePermission(p.value)}
+                        onChange={() =>
+                          togglePermission(p.value)
+                        }
                       />
                       <span>
                         <span className="font-medium">
@@ -140,8 +187,8 @@ export default function CreateDepartmentPage() {
             </div>
 
             <div className="flex gap-3 mt-4">
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Creating...' : 'Create'}
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : 'Save changes'}
               </Button>
               <Button
                 type="button"
