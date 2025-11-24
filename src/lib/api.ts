@@ -1,69 +1,100 @@
 // src/lib/api.ts
 
 import axios from './axios';
+
 import type { LoginResponse } from '@/types/auth';
-import type { Employee, CreateEmployeeInput, UpdateEmployeeInput } from '@/types/employee';
+import type {
+  Employee,
+  CreateEmployeeInput,
+  UpdateEmployeeInput,
+} from '@/types/employee';
 import type {
   Department,
   CreateDepartmentInput,
   UpdateDepartmentInput,
 } from '@/types/department';
+import type { Tenant } from '@/types/tenant';
+
+// AUTH
 
 export const authApi = {
   login: async (email: string, password: string): Promise<LoginResponse> => {
-    const { data } = await axios.post('/auth/login', { email, password });
+    const { data } = await axios.post<LoginResponse>('/auth/login', {
+      email,
+      password,
+    });
     return data;
   },
+
   logout: async (): Promise<void> => {
     await axios.post('/auth/logout');
   },
+
   profile: async () => {
     const { data } = await axios.post('/auth/profile');
     return data;
   },
 };
 
+// EMPLOYEES
+
 export const employeeApi = {
   all: async (): Promise<Employee[]> => {
-    const { data } = await axios.get('/employees');
+    const { data } = await axios.get<Employee[]>('/employees');
     return data;
   },
+
   one: async (id: string): Promise<Employee> => {
-    const { data } = await axios.get(`/employees/${id}`);
+    const { data } = await axios.get<Employee>(`/employees/${id}`);
     return data;
   },
+
   create: async (input: CreateEmployeeInput): Promise<Employee> => {
-    const { data } = await axios.post('/employees', input);
+    const { data } = await axios.post<Employee>('/employees', input);
     return data;
   },
+
   update: async (id: string, input: UpdateEmployeeInput): Promise<Employee> => {
-    const { data } = await axios.patch(`/employees/${id}`, input);
+    const { data } = await axios.patch<Employee>(`/employees/${id}`, input);
     return data;
   },
+
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/employees/${id}`);
   },
+
   resetPassword: async (id: string, newPassword: string): Promise<Employee> => {
-    const { data } = await axios.patch(`/employees/${id}/reset-password`, {
-      newPassword,
-    });
+    const { data } = await axios.patch<Employee>(
+      `/employees/${id}/reset-password`,
+      {
+        newPassword,
+      },
+    );
     return data;
   },
 };
 
+// DEPARTMENTS
+
 export const departmentApi = {
   all: async (): Promise<Department[]> => {
-    const { data } = await axios.get('/departments');
+    const { data } = await axios.get<Department[]>('/departments');
     return data;
   },
 
   create: async (input: CreateDepartmentInput): Promise<Department> => {
-    const { data } = await axios.post('/departments', input);
+    const { data } = await axios.post<Department>('/departments', input);
     return data;
   },
 
-  update: async (id: string, input: UpdateDepartmentInput): Promise<Department> => {
-    const { data } = await axios.patch(`/departments/${id}`, input);
+  update: async (
+    id: string,
+    input: UpdateDepartmentInput,
+  ): Promise<Department> => {
+    const { data } = await axios.patch<Department>(
+      `/departments/${id}`,
+      input,
+    );
     return data;
   },
 
@@ -72,4 +103,28 @@ export const departmentApi = {
   },
 };
 
+// TENANTS (platform admin only)
 
+export const tenantApi = {
+  all: async (): Promise<Tenant[]> => {
+    const { data } = await axios.get<Tenant[]>('/tenants');
+    return data;
+  },
+
+  create: async (input: { key: string; name: string; isActive?: boolean }) => {
+    const { data } = await axios.post<Tenant>('/tenants', input);
+    return data;
+  },
+
+  provision: async (input: {
+    key: string;
+    name: string;
+    isActive?: boolean;
+    adminEmail: string;
+    adminPassword: string;
+    adminFullName: string;
+  }) => {
+    const { data } = await axios.post('/tenants/provision', input);
+    return data;
+  },
+};
