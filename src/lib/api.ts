@@ -62,6 +62,16 @@ export const employeeApi = {
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/employees/${id}`);
   },
+
+  resetPassword: async (id: string, newPassword: string): Promise<Employee> => {
+    const { data } = await axios.patch<Employee>(
+      `/employees/${id}/reset-password`,
+      {
+        newPassword,
+      },
+    );
+    return data;
+  },
 };
 
 // DEPARTMENTS
@@ -69,11 +79,6 @@ export const employeeApi = {
 export const departmentApi = {
   all: async (): Promise<Department[]> => {
     const { data } = await axios.get<Department[]>('/departments');
-    return data;
-  },
-
-  one: async (id: string): Promise<Department> => {
-    const { data } = await axios.get<Department>(`/departments/${id}`);
     return data;
   },
 
@@ -86,7 +91,10 @@ export const departmentApi = {
     id: string,
     input: UpdateDepartmentInput,
   ): Promise<Department> => {
-    const { data } = await axios.patch<Department>(`/departments/${id}`, input);
+    const { data } = await axios.patch<Department>(
+      `/departments/${id}`,
+      input,
+    );
     return data;
   },
 
@@ -105,6 +113,18 @@ export const tenantApi = {
 
   create: async (input: { key: string; name: string; isActive?: boolean }) => {
     const { data } = await axios.post<Tenant>('/tenants', input);
+    return data;
+  },
+
+  provision: async (input: {
+    key: string;
+    name: string;
+    isActive?: boolean;
+    adminEmail: string;
+    adminPassword: string;
+    adminFullName: string;
+  }) => {
+    const { data } = await axios.post('/tenants/provision', input);
     return data;
   },
 };

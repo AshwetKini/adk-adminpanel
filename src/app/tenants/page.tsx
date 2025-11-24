@@ -10,7 +10,13 @@ export default function TenantsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({ key: '', name: '' });
+  const [form, setForm] = useState({
+    key: '',
+    name: '',
+    adminEmail: '',
+    adminPassword: '',
+    adminFullName: '',
+  });
 
   async function loadTenants() {
     try {
@@ -28,7 +34,11 @@ export default function TenantsPage() {
         })),
       );
     } catch (e: any) {
-      setError(e?.response?.data?.message || e.message || 'Failed to load tenants');
+      setError(
+        e?.response?.data?.message ||
+          e.message ||
+          'Failed to load tenants',
+      );
     } finally {
       setLoading(false);
     }
@@ -40,16 +50,35 @@ export default function TenantsPage() {
 
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.key || !form.name) return;
+    if (
+      !form.key.trim() ||
+      !form.name.trim() ||
+      !form.adminEmail.trim() ||
+      !form.adminPassword.trim() ||
+      !form.adminFullName.trim()
+    ) {
+      setError('All fields are required');
+      return;
+    }
+
     try {
       setCreating(true);
       setError('');
-      await tenantApi.create({
+      await tenantApi.provision({
         key: form.key.trim(),
         name: form.name.trim(),
         isActive: true,
+        adminEmail: form.adminEmail.trim(),
+        adminPassword: form.adminPassword,
+        adminFullName: form.adminFullName.trim(),
       });
-      setForm({ key: '', name: '' });
+      setForm({
+        key: '',
+        name: '',
+        adminEmail: '',
+        adminPassword: '',
+        adminFullName: '',
+      });
       await loadTenants();
     } catch (e: any) {
       setError(
@@ -67,7 +96,7 @@ export default function TenantsPage() {
       <h1 className="text-2xl font-semibold">Tenants</h1>
 
       <section className="max-w-xl border border-gray-200 rounded p-4 space-y-3">
-        <h2 className="font-medium text-lg">Create Tenant</h2>
+        <h2 className="font-medium text-lg">Provision Tenant</h2>
         <form onSubmit={onCreate} className="space-y-3">
           <div>
             <label className="block text-sm mb-1">Key (URL safe)</label>
@@ -82,7 +111,7 @@ export default function TenantsPage() {
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Name</label>
+            <label className="block text-sm mb-1">Tenant Name</label>
             <input
               type="text"
               className="w-full border rounded px-2 py-1 text-sm"
@@ -93,12 +122,54 @@ export default function TenantsPage() {
               placeholder="ACME HR"
             />
           </div>
+          <div>
+            <label className="block text-sm mb-1">Admin Email</label>
+            <input
+              type="email"
+              className="w-full border rounded px-2 py-1 text-sm"
+              value={form.adminEmail}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, adminEmail: e.target.value }))
+              }
+              placeholder="admin@acme-hr.com"
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Admin Password</label>
+            <input
+              type="password"
+              className="w-full border rounded px-2 py-1 text-sm"
+              value={form.adminPassword}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  adminPassword: e.target.value,
+                }))
+              }
+              placeholder="StrongPassword123!"
+            />
+          </div>
+          <div>
+            <label className="block text-sm mb-1">Admin Full Name</label>
+            <input
+              type="text"
+              className="w-full border rounded px-2 py-1 text-sm"
+              value={form.adminFullName}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  adminFullName: e.target.value,
+                }))
+              }
+              placeholder="ACME Admin"
+            />
+          </div>
           <button
             type="submit"
             disabled={creating}
             className="px-3 py-1.5 rounded bg-blue-600 text-white text-sm disabled:opacity-60"
           >
-            {creating ? 'Creating…' : 'Create Tenant'}
+            {creating ? 'Provisioning…' : 'Provision Tenant'}
           </button>
         </form>
       </section>
@@ -131,3 +202,4 @@ export default function TenantsPage() {
     </main>
   );
 }
+
