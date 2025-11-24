@@ -2,6 +2,7 @@
 
 'use client';
 
+import type React from 'react';
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 
@@ -42,11 +43,13 @@ export default function EditEmployee() {
     }));
   }
 
-  function onSelectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const { name, value } = e.target;
+  // NEW: handle multi-select departments
+  function onDepartmentsChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const options = e.target.selectedOptions;
+    const selected = Array.from(options).map((o) => o.value);
     setForm((prev) => ({
       ...prev,
-      [name]: value,
+      departments: selected,
     }));
   }
 
@@ -59,15 +62,25 @@ export default function EditEmployee() {
         ]);
 
         setEmp(empData);
+
+        // Prefer existing multi-departments; fallback to single department if present
+        const initialDepartments =
+          empData.departments && empData.departments.length > 0
+            ? empData.departments
+            : empData.department
+            ? [empData.department]
+            : [];
+
         setForm({
           employeeId: empData.employeeId,
           email: empData.email,
           fullName: empData.fullName,
-          department: empData.department,
+          departments: initialDepartments,
           position: empData.position,
           phoneNumber: empData.phoneNumber,
           isActive: empData.isActive,
         });
+
         setDepartments(deps);
       } finally {
         setDepsLoading(false);
@@ -119,9 +132,12 @@ export default function EditEmployee() {
       {showSuccess && (
         <div className="fixed z-50 inset-0 bg-black/40 flex items-center justify-center">
           <div className="bg-white rounded shadow-lg p-6 max-w-sm w-full text-center">
-            <h2 className="text-xl font-semibold mb-2">Password reset successfully</h2>
+            <h2 className="text-xl font-semibold mb-2">
+              Password reset successfully
+            </h2>
             <p className="text-gray-600 mb-4">
-              The new password is now set. The employee will use this on their next login.
+              The new password is now set. The employee will use this on their
+              next login.
             </p>
             <button
               onClick={() => {
@@ -161,31 +177,39 @@ export default function EditEmployee() {
               onChange={onChange}
             />
 
-            {/* Department dropdown */}
+            {/* Departments multi-select */}
             <div>
               <label className="block text-sm font-medium mb-1">
-                Department
+                Departments
               </label>
               {depsLoading ? (
-                <div className="text-sm text-gray-600">Loading departments...</div>
+                <div className="text-sm text-gray-600">
+                  Loading departments...
+                </div>
               ) : departments.length === 0 ? (
                 <div className="text-sm text-gray-600">
                   No departments found. Please create a department first.
                 </div>
               ) : (
-                <select
-                  name="department"
-                  value={form.department || ''}
-                  onChange={onSelectChange}
-                  className="w-full border rounded h-10 px-3 text-sm"
-                >
-                  <option value="">Select department</option>
-                  {departments.map((d) => (
-                    <option key={d._id} value={d.name}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    name="departments"
+                    multiple
+                    value={form.departments || []}
+                    onChange={onDepartmentsChange}
+                    className="w-full border rounded px-3 py-2 h-32 text-sm"
+                  >
+                    {departments.map((d) => (
+                      <option key={d._id} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Select one or more departments this employee should have
+                    access to.
+                  </p>
+                </>
               )}
             </div>
 
@@ -234,7 +258,8 @@ export default function EditEmployee() {
           <form onSubmit={onResetPassword} className="space-y-4">
             <h2 className="text-lg font-semibold">Reset Password</h2>
             <p className="text-sm text-gray-600">
-              Set a new password for this employee. They will use this new password on next login.
+              Set a new password for this employee. They will use this new
+              password on next login.
             </p>
             <Input
               label="New Password"
