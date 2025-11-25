@@ -3,12 +3,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { customerApi } from '@/lib/api';
 import type { Customer } from '@/types/customer';
-import { useRouter } from 'next/navigation';
 
 export default function EmployeeCustomersPage() {
   const router = useRouter();
@@ -62,10 +62,10 @@ export default function EmployeeCustomersPage() {
                     Name
                   </th>
                   <th className="text-left py-2">
-                    Email
+                    Company
                   </th>
                   <th className="text-left py-2">
-                    Department
+                    Mobile
                   </th>
                   <th className="text-left py-2">
                     Status
@@ -85,10 +85,10 @@ export default function EmployeeCustomersPage() {
                       {c.fullName}
                     </td>
                     <td className="py-2">
-                      {c.email}
+                      {c.companyName || '-'}
                     </td>
                     <td className="py-2">
-                      {c.department || '-'}
+                      {c.mobileNumber}
                     </td>
                     <td className="py-2">
                       {c.isActive ? 'Active' : 'Inactive'}

@@ -3,9 +3,9 @@
 export interface Customer {
   _id: string;
   customerId: string;
-  email: string;
   fullName: string;
-  department?: string;
+  companyName?: string;
+  mobileNumber: string;
   notes?: string;
   isActive: boolean;
   createdAt: string;
@@ -14,18 +14,18 @@ export interface Customer {
 
 export interface CreateCustomerInput {
   customerId: string;
-  email: string;
   fullName: string;
+  companyName?: string;
+  mobileNumber: string;
   password: string;
-  department?: string;
   notes?: string;
 }
 
 export interface UpdateCustomerInput {
   customerId?: string;
-  email?: string;
   fullName?: string;
-  department?: string;
+  companyName?: string;
+  mobileNumber?: string;
   notes?: string;
   isActive?: boolean;
 }

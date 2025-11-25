@@ -2,46 +2,30 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
-import { customerApi, departmentApi } from '@/lib/api';
+import { customerApi } from '@/lib/api';
 import type { CreateCustomerInput } from '@/types/customer';
-import type { Department } from '@/types/department';
 
 export default function EmployeeCreateCustomerPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const [form, setForm] = useState<CreateCustomerInput>({
     customerId: '',
-    email: '',
     fullName: '',
+    companyName: '',
+    mobileNumber: '',
     password: '',
-    department: '',
     notes: '',
   });
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [depsLoading, setDepsLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const list = await departmentApi.all();
-        setDepartments(list);
-      } finally {
-        setDepsLoading(false);
-      }
-    })();
-  }, []);
-
-  function onChange(
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) {
+  function onChange(e: React.ChangeEvent<HTMLInputElement>) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
@@ -89,49 +73,40 @@ export default function EmployeeCreateCustomerPage() {
               onChange={onChange}
             />
             <Input
-              label="Email"
-              name="email"
-              type="email"
-              value={form.email}
+              label="Customer's Company Name (optional)"
+              name="companyName"
+              value={form.companyName || ''}
               onChange={onChange}
             />
             <Input
-              label="Password"
-              name="password"
-              type="password"
-              value={form.password}
+              label="Mobile Number"
+              name="mobileNumber"
+              value={form.mobileNumber}
               onChange={onChange}
             />
 
-            {/* Department (optional, any dept in tenant) */}
-            {/* <div>
-              <label className="block text-sm font-medium mb-1">
-                Department (optional)
+            {/* Password with eye (show/hide) */}
+            <div className="w-full">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
               </label>
-              {depsLoading ? (
-                <div className="text-sm text-gray-600">
-                  Loading departments...
-                </div>
-              ) : departments.length === 0 ? (
-                <div className="text-sm text-gray-600">
-                  No departments found.
-                </div>
-              ) : (
-                <select
-                  name="department"
-                  value={form.department || ''}
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  value={form.password}
                   onChange={onChange}
-                  className="w-full border rounded px-3 py-2 text-sm"
+                  className="h-10 w-full rounded-md border bg-white px-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 border-gray-300"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute inset-y-0 right-0 px-3 text-xs text-gray-500 hover:text-gray-700"
                 >
-                  <option value="">Select department</option>
-                  {departments.map((d) => (
-                    <option key={d._id} value={d.name}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div> */}
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+            </div>
 
             <Input
               label="Notes (optional)"

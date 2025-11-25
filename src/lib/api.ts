@@ -136,17 +136,19 @@ export const tenantApi = {
 
 export const customerApi = {
   all: async (): Promise<Customer[]> => {
-    const { data } = await axios.get('/customers');
+    const { data } = await axios.get<Customer[]>('/customers');
     return data;
   },
 
   one: async (id: string): Promise<Customer> => {
-    const { data } = await axios.get(`/customers/${id}`);
+    const { data } = await axios.get<Customer>(`/customers/${id}`);
     return data;
   },
 
-  create: async (input: CreateCustomerInput): Promise<Customer> => {
-    const { data } = await axios.post('/customers', input);
+  create: async (
+    input: CreateCustomerInput,
+  ): Promise<Customer> => {
+    const { data } = await axios.post<Customer>('/customers', input);
     return data;
   },
 
@@ -154,7 +156,10 @@ export const customerApi = {
     id: string,
     input: UpdateCustomerInput,
   ): Promise<Customer> => {
-    const { data } = await axios.patch(`/customers/${id}`, input);
+    const { data } = await axios.patch<Customer>(
+      `/customers/${id}`,
+      input,
+    );
     return data;
   },
 
@@ -162,7 +167,10 @@ export const customerApi = {
     await axios.delete(`/customers/${id}`);
   },
 
-  resetPassword: async (id: string, newPassword: string) => {
+  resetPassword: async (
+    id: string,
+    newPassword: string,
+  ): Promise<void> => {
     await axios.patch(`/customers/${id}/reset-password`, {
       newPassword,
     });
