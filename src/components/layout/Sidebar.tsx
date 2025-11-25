@@ -1,4 +1,5 @@
 // src/components/layout/Sidebar.tsx
+
 'use client';
 
 import Link from 'next/link';
@@ -22,35 +23,65 @@ function parseJwt(token: string | null): any | null {
   }
 }
 
-const tenantMenu = [
+type MenuItem = { title: string; href: string };
+
+const tenantMenu: MenuItem[] = [
   { title: 'Dashboard', href: '/dashboard' },
   { title: 'Employees', href: '/employees' },
   { title: 'Departments', href: '/departments' },
 ];
 
-const platformMenu = [
+const platformMenu: MenuItem[] = [
   { title: 'Dashboard', href: '/dashboard' },
   { title: 'Tenants', href: '/tenants' },
 ];
 
+// UPDATED: employee sidebar menu, now includes Customers
+const employeeMenu: MenuItem[] = [
+  { title: 'My Dashboard', href: '/employee/dashboard' },
+  { title: 'My Department', href: '/employee/department' },
+  { title: 'Customers', href: '/employee/customers' }, // wire customer module here
+];
+
 export default function Sidebar() {
   const pathname = usePathname();
-  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
+
+  const [role, setRole] = useState<string | null>(null);
+  const [tenantKey, setTenantKey] = useState<string | null>(null);
+  const [userName, setUserName] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const token = localStorage.getItem('access_token');
     const payload = parseJwt(token);
-
-    if (payload?.role === 'platform-admin' && payload?.tenantKey === 'platform') {
-      setIsPlatformAdmin(true);
-    } else {
-      setIsPlatformAdmin(false);
+    if (payload) {
+      setRole(payload.role || null);
+      setTenantKey(payload.tenantKey || null);
+      setUserName(payload.fullName || payload.email || null);
     }
   }, []);
 
+  const isPlatformAdmin =
+    role === 'platform-admin' && tenantKey === 'platform';
+  const isEmployee = role === 'employee';
+  const isTenantAdmin = role === 'superadmin' || role === 'admin';
+
+  let menu: MenuItem[] = tenantMenu;
+  if (isPlatformAdmin) {
+    menu = platformMenu;
+  } else if (isEmployee) {
+    menu = employeeMenu;
+  } else if (!isTenantAdmin && !isPlatformAdmin && !isEmployee) {
+    menu = [{ title: 'Dashboard', href: '/dashboard' }];
+  }
+
   async function handleLogout() {
-    await fetch('/api/session', { method: 'DELETE' });
+    try {
+      await fetch('/api/session', { method: 'DELETE' });
+    } catch {
+      // ignore
+    }
+
     if (typeof window !== 'undefined') {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
@@ -58,22 +89,32 @@ export default function Sidebar() {
     }
   }
 
-  const menu = isPlatformAdmin ? platformMenu : tenantMenu;
-
   return (
-    <aside className="w-64 bg-gray-900 text-white min-h-screen flex flex-col">
-      <div className="p-4 font-bold text-xl border-b border-gray-700">
-        ADK System Admin
+    <aside className="w-64 bg-slate-900 text-slate-100 flex flex-col">
+      {/* Brand / Tenant */}
+      <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
+        <div>
+          <div className="text-sm font-semibold tracking-wide">
+            ADK System
+          </div>
+          <div className="text-[11px] text-slate-400">
+            {tenantKey || 'Admin Panel'}
+          </div>
+        </div>
       </div>
-      <nav className="flex-1 p-2 space-y-1">
+
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {menu.map((item) => {
-          const active = pathname.startsWith(item.href);
+          const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`block px-3 py-2 rounded ${
-                active ? 'bg-gray-700' : 'hover:bg-gray-800'
+              className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
+                active
+                  ? 'bg-blue-500 text-white'
+                  : 'text-slate-200 hover:bg-slate-800 hover:text-white'
               }`}
             >
               {item.title}
@@ -81,12 +122,25 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <button
-        onClick={handleLogout}
-        className="m-4 px-3 py-2 rounded bg-red-600 hover:bg-red-700 text-sm"
-      >
-        Logout
-      </button>
+
+      {/* User + Logout */}
+      <div className="border-t border-slate-800 px-3 py-3 text-xs flex items-center justify-between gap-3 bg-slate-950/40">
+        <div className="flex flex-col overflow-hidden">
+          <span className="font-medium truncate">
+            {userName || 'Logged in'}
+          </span>
+          <span className="text-slate-400 capitalize truncate">
+            {role || 'user'}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="text-xs px-3 py-1.5 rounded-md bg-slate-800 text-slate-100 hover:bg-red-600 hover:text-white transition-colors"
+        >
+          Logout
+        </button>
+      </div>
     </aside>
   );
 }

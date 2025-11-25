@@ -5,6 +5,7 @@ export interface User {
   fullName: string;
   role: string;
   department?: string;
+  departments?: string[]; // NEW: all department accesses
   tenantId?: string;
   tenantKey?: string;
 }

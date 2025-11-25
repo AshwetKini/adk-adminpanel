@@ -5,7 +5,8 @@ export interface Employee {
   email: string;
   fullName: string;
   role: string;
-  department?: string;
+  department?: string;      // legacy single department
+  departments?: string[];   // NEW: multiple departments
   position?: string;
   phoneNumber?: string;
   isActive: boolean;
@@ -18,7 +19,8 @@ export interface CreateEmployeeInput {
   email: string;
   password: string;
   fullName: string;
-  department?: string;
+  department?: string;      // optional, for backward compatibility
+  departments?: string[];   // NEW
   position?: string;
   phoneNumber?: string;
 }
@@ -28,7 +30,8 @@ export interface UpdateEmployeeInput {
   email?: string;
   password?: string;
   fullName?: string;
-  department?: string;
+  department?: string;      // optional, for backward compatibility
+  departments?: string[];   // NEW
   position?: string;
   phoneNumber?: string;
   isActive?: boolean;

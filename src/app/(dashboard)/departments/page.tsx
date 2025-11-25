@@ -47,7 +47,9 @@ export default function DepartmentsPage() {
       <Card>
         <CardContent>
           {list.length === 0 ? (
-            <div className="text-sm text-gray-600">No departments yet. Create the first one.</div>
+            <div className="text-sm text-gray-600">
+              No departments yet. Create the first one.
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -59,23 +61,49 @@ export default function DepartmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {list.map((d) => (
-                  <tr key={d._id} className="border-b last:border-0">
-                    <td className="py-2">{d.name}</td>
-                    <td className="py-2">{d.description || '-'}</td>
-                    <td className="py-2">{d.isActive ? 'Active' : 'Inactive'}</td>
-                    <td className="py-2 text-right">
-                      {/* You can add an edit page later */}
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => onDelete(d._id)}
-                      >
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {list.map((d) => {
+                  const hasPermissions =
+                    d.permissions && d.permissions.length > 0;
+
+                  return (
+                    <tr
+                      key={d._id} // <-- use _id here
+                      className="border-b last:border-0"
+                    >
+                      <td className="py-2 align-top">
+                        <div className="font-medium">{d.name}</div>
+                        {hasPermissions && (
+                          <div className="text-[11px] text-gray-500">
+                            Permissions: {d.permissions?.join(', ')}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-2 align-top">
+                        {d.description || '-'}
+                      </td>
+                      <td className="py-2 align-top">
+                        {d.isActive ? 'Active' : 'Inactive'}
+                      </td>
+                      <td className="py-2 align-top text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Link
+                            href={`/departments/${d._id}/edit`} // <-- use _id here
+                            className="text-blue-600 underline"
+                          >
+                            Edit
+                          </Link>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => onDelete(d._id)} // <-- and here
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

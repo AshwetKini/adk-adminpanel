@@ -14,6 +14,11 @@ import type {
   UpdateDepartmentInput,
 } from '@/types/department';
 import type { Tenant } from '@/types/tenant';
+import type {
+  Customer,
+  CreateCustomerInput,
+  UpdateCustomerInput,
+} from '@/types/customer';
 
 // AUTH
 
@@ -74,8 +79,8 @@ export const employeeApi = {
   },
 };
 
-// DEPARTMENTS
 
+// DEPARTMENTS
 export const departmentApi = {
   all: async (): Promise<Department[]> => {
     const { data } = await axios.get<Department[]>('/departments');
@@ -126,5 +131,48 @@ export const tenantApi = {
   }) => {
     const { data } = await axios.post('/tenants/provision', input);
     return data;
+  },
+};
+
+export const customerApi = {
+  all: async (): Promise<Customer[]> => {
+    const { data } = await axios.get<Customer[]>('/customers');
+    return data;
+  },
+
+  one: async (id: string): Promise<Customer> => {
+    const { data } = await axios.get<Customer>(`/customers/${id}`);
+    return data;
+  },
+
+  create: async (
+    input: CreateCustomerInput,
+  ): Promise<Customer> => {
+    const { data } = await axios.post<Customer>('/customers', input);
+    return data;
+  },
+
+  update: async (
+    id: string,
+    input: UpdateCustomerInput,
+  ): Promise<Customer> => {
+    const { data } = await axios.patch<Customer>(
+      `/customers/${id}`,
+      input,
+    );
+    return data;
+  },
+
+  remove: async (id: string): Promise<void> => {
+    await axios.delete(`/customers/${id}`);
+  },
+
+  resetPassword: async (
+    id: string,
+    newPassword: string,
+  ): Promise<void> => {
+    await axios.patch(`/customers/${id}/reset-password`, {
+      newPassword,
+    });
   },
 };
