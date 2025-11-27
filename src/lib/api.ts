@@ -79,8 +79,8 @@ export const employeeApi = {
   },
 };
 
-
 // DEPARTMENTS
+
 export const departmentApi = {
   all: async (): Promise<Department[]> => {
     const { data } = await axios.get<Department[]>('/departments');
@@ -116,8 +116,18 @@ export const tenantApi = {
     return data;
   },
 
-  create: async (input: { key: string; name: string; isActive?: boolean }) => {
+  create: async (
+    input: { key: string; name: string; isActive?: boolean }
+  ): Promise<Tenant> => {
     const { data } = await axios.post<Tenant>('/tenants', input);
+    return data;
+  },
+
+  update: async (
+    id: string,
+    input: { name?: string; isActive?: boolean },
+  ): Promise<Tenant> => {
+    const { data } = await axios.patch<Tenant>(`/tenants/${id}`, input);
     return data;
   },
 
@@ -128,7 +138,7 @@ export const tenantApi = {
     adminEmail: string;
     adminPassword: string;
     adminFullName: string;
-  }) => {
+  }): Promise<any> => {
     const { data } = await axios.post('/tenants/provision', input);
     return data;
   },
