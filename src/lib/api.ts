@@ -150,6 +150,11 @@ export const tenantApi = {
     await axios.patch(`/tenants/${id}/reset-admin-password`, { newPassword });
   },
 
+   renameKey: async (id: string, key: string) => {
+    const { data } = await axios.patch(`/tenants/${id}/key`, { key });
+    return data;
+  },
+
 };
 
 export const customerApi = {
