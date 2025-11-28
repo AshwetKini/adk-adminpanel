@@ -7,4 +7,8 @@ export interface Tenant {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+
+   // this will return admin details if the tenant has an admin assigned
+  adminEmail?: string | null;
+  adminFullName?: string | null;
 }

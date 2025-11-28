@@ -1,4 +1,4 @@
-// src/app/tenants/page.tsx
+// src/app/(dashboard)/tenants/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -12,6 +12,9 @@ export default function TenantsPage() {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] =
+    useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [form, setForm] = useState({
     key: '',
@@ -28,13 +31,15 @@ export default function TenantsPage() {
       const data = await tenantApi.all();
       setTenants(
         data.map((t: any) => ({
-          id: t._id?.toString?.() ?? t.id,
+          id: t.id ?? t._id?.toString?.(),
           _id: t._id?.toString?.() ?? t.id,
           key: t.key,
           name: t.name,
           isActive: t.isActive,
           createdAt: t.createdAt,
           updatedAt: t.updatedAt,
+          adminEmail: t.adminEmail ?? null,
+          adminFullName: t.adminFullName ?? null,
         })),
       );
     } catch (e: any) {
@@ -77,6 +82,7 @@ export default function TenantsPage() {
         adminPassword: form.adminPassword,
         adminFullName: form.adminFullName.trim(),
       });
+      const createdName = form.name;
       setForm({
         key: '',
         name: '',
@@ -84,7 +90,9 @@ export default function TenantsPage() {
         adminPassword: '',
         adminFullName: '',
       });
-      setSuccessMessage(`Tenant "${form.name}" provisioned successfully!`);
+      setSuccessMessage(
+        `Tenant "${createdName}" provisioned successfully!`,
+      );
       await loadTenants();
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (e: any) {
@@ -98,7 +106,7 @@ export default function TenantsPage() {
     }
   }
 
-  async function toggleTenantActive(t: Tenant) {
+  async function toggleTenantActive(t: Tenant & { _id?: string }) {
     const action = t.isActive ? 'disable' : 'enable';
     if (
       !window.confirm(
@@ -108,19 +116,23 @@ export default function TenantsPage() {
       return;
     }
 
-    setUpdatingId(t._id);
+    const id = t._id ?? t.id;
+    setUpdatingId(id);
     setError('');
     try {
-      const updated = await tenantApi.update(t._id, {
+      const updated = await tenantApi.update(id, {
         isActive: !t.isActive,
       });
 
       setTenants((prev) =>
-        prev.map((x) =>
-          x._id === updated._id
+        prev.map((x: any) =>
+          x._id === updated._id ||
+          x.id === updated.id ||
+          x.id === updated._id?.toString?.()
             ? {
+                ...x,
                 ...updated,
-                id: updated._id?.toString?.() ?? updated.id,
+                id: updated.id ?? updated._id?.toString?.(),
                 _id: updated._id?.toString?.() ?? updated.id,
               }
             : x,
@@ -139,9 +151,65 @@ export default function TenantsPage() {
     }
   }
 
+  async function handleResetAdminPassword(t: Tenant & { _id?: string }) {
+    const id = t._id ?? t.id;
+
+    const newPassword = window.prompt(
+      `Enter new admin password for tenant "${t.name}" (${t.key}):`,
+    );
+
+    if (!newPassword || !newPassword.trim()) {
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Are you sure you want to reset the admin password for "${t.name}"?`,
+      )
+    ) {
+      return;
+    }
+
+    setError('');
+    setSuccessMessage('');
+    try {
+      await tenantApi.resetAdminPassword(id, newPassword.trim());
+      setSuccessMessage(
+        `Admin password for tenant "${t.name}" has been reset successfully.`,
+      );
+      setTimeout(() => setSuccessMessage(''), 4000);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message ||
+          'Failed to reset tenant admin password',
+      );
+    }
+  }
+
+  async function handleDelete(id: string, tenantName: string) {
+    setDeleting(id);
+    try {
+      await tenantApi.remove(id);
+      alert('Tenant deleted successfully');
+      setTenants((prev) =>
+        prev.filter((t: any) => t._id !== id && t.id !== id),
+      );
+      setShowDeleteConfirm(null);
+      setSuccessMessage(`Tenant "${tenantName}" deleted successfully!`);
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: any) {
+      setError(
+        err?.response?.data?.message || 'Failed to delete tenant',
+      );
+    } finally {
+      setDeleting(null);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-8">
       <div className="max-w-7xl mx-auto space-y-8">
+        {/* Header */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h1 className="text-3xl font-bold text-gray-900">
             Tenant Management
@@ -151,6 +219,7 @@ export default function TenantsPage() {
           </p>
         </div>
 
+        {/* Messages */}
         {successMessage && (
           <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg flex items-center gap-2 shadow-sm">
             <span className="font-medium">{successMessage}</span>
@@ -163,6 +232,7 @@ export default function TenantsPage() {
           </div>
         )}
 
+        {/* Provision form */}
         <section className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -180,6 +250,7 @@ export default function TenantsPage() {
 
           <form onSubmit={onCreate} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Tenant Key */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Tenant Key <span className="text-red-500">*</span>
@@ -199,6 +270,7 @@ export default function TenantsPage() {
                 </p>
               </div>
 
+              {/* Tenant Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Tenant Name <span className="text-red-500">*</span>
@@ -218,6 +290,7 @@ export default function TenantsPage() {
                 </p>
               </div>
 
+              {/* Admin Email */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Admin Email <span className="text-red-500">*</span>
@@ -237,6 +310,7 @@ export default function TenantsPage() {
                 />
               </div>
 
+              {/* Admin Full Name */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Admin Full Name <span className="text-red-500">*</span>
@@ -256,6 +330,7 @@ export default function TenantsPage() {
                 />
               </div>
 
+              {/* Admin Password */}
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Admin Password <span className="text-red-500">*</span>
@@ -291,6 +366,7 @@ export default function TenantsPage() {
           </form>
         </section>
 
+        {/* Tenants table */}
         <section className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -301,7 +377,9 @@ export default function TenantsPage() {
                 <p className="text-sm text-gray-600 mt-1">
                   {loading
                     ? 'Loading...'
-                    : `${tenants.length} tenant${tenants.length !== 1 ? 's' : ''} total`}
+                    : `${tenants.length} tenant${
+                        tenants.length !== 1 ? 's' : ''
+                      } total`}
                 </p>
               </div>
               <button
@@ -317,7 +395,7 @@ export default function TenantsPage() {
           {loading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
-                <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-3"></div>
+                <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-3" />
                 <p className="text-gray-600 text-sm">Loading tenants...</p>
               </div>
             </div>
@@ -340,6 +418,12 @@ export default function TenantsPage() {
                       Name
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Admin Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Admin Name
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -348,7 +432,7 @@ export default function TenantsPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {tenants.map((t) => (
+                  {tenants.map((t: any) => (
                     <tr
                       key={t.id}
                       className="hover:bg-gray-50 transition-colors"
@@ -361,6 +445,16 @@ export default function TenantsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
                           {t.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {t.adminEmail || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {t.adminFullName || '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -379,19 +473,64 @@ export default function TenantsPage() {
                           {t.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                        {/* Enable / Disable */}
                         <Button
                           variant={t.isActive ? 'danger' : 'primary'}
                           size="sm"
-                          disabled={updatingId === t._id}
+                          disabled={updatingId === (t._id ?? t.id)}
                           onClick={() => toggleTenantActive(t)}
                         >
-                          {updatingId === t._id
+                          {updatingId === (t._id ?? t.id)
                             ? 'Updating...'
                             : t.isActive
                             ? 'Disable'
                             : 'Enable'}
                         </Button>
+
+                        {/* Reset admin password */}
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleResetAdminPassword(t)}
+                        >
+                          Reset Admin Password
+                        </Button>
+
+                        {/* Delete tenant */}
+                        {showDeleteConfirm === (t._id ?? t.id) ? (
+                          <span className="inline-flex gap-2">
+                            <Button
+                              variant="danger"
+                              size="sm"
+                              disabled={deleting === (t._id ?? t.id)}
+                              onClick={() =>
+                                handleDelete(t._id ?? t.id, t.name)
+                              }
+                            >
+                              {deleting === (t._id ?? t.id)
+                                ? 'Deleting...'
+                                : 'Confirm'}
+                            </Button>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => setShowDeleteConfirm(null)}
+                            >
+                              Cancel
+                            </Button>
+                          </span>
+                        ) : (
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() =>
+                              setShowDeleteConfirm(t._id ?? t.id)
+                            }
+                          >
+                            Delete
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}

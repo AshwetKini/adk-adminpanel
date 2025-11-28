@@ -17,8 +17,8 @@ export default function LoginPage() {
   const sp = useSearchParams();
   const redirect = sp.get('redirect');
 
-  const [email, setEmail] = useState('superadmin@adksystem.com');
-  const [password, setPassword] = useState('SuperAdmin@2025');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 

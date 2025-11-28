@@ -142,6 +142,14 @@ export const tenantApi = {
     const { data } = await axios.post('/tenants/provision', input);
     return data;
   },
+    remove: async (id: string): Promise<void> => {
+    await axios.delete(`/tenants/${id}`);
+  },
+
+  resetAdminPassword: async (id: string, newPassword: string): Promise<void> => {
+    await axios.patch(`/tenants/${id}/reset-admin-password`, { newPassword });
+  },
+
 };
 
 export const customerApi = {
