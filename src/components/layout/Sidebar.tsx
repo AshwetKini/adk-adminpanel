@@ -41,6 +41,7 @@ const employeeMenu: MenuItem[] = [
   { title: 'My Dashboard', href: '/employee/dashboard' },
   { title: 'My Department', href: '/employee/department' },
   { title: 'Customers', href: '/employee/customers' }, // customer module
+  { title: 'Shipments', href: '/employee/shipments' },
   { title: 'Import Shipments', href: '/shipments/import' }, // new shipments import page
 ];
 

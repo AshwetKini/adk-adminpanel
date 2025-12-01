@@ -1,24 +1,12 @@
 // src/lib/api.ts
 
 import axios from './axios';
-
 import type { LoginResponse } from '@/types/auth';
-import type {
-  Employee,
-  CreateEmployeeInput,
-  UpdateEmployeeInput,
-} from '@/types/employee';
-import type {
-  Department,
-  CreateDepartmentInput,
-  UpdateDepartmentInput,
-} from '@/types/department';
+import type { Employee,CreateEmployeeInput,UpdateEmployeeInput,} from '@/types/employee';
+import type { Department,CreateDepartmentInput,UpdateDepartmentInput,} from '@/types/department';
 import type { Tenant } from '@/types/tenant';
-import type {
-  Customer,
-  CreateCustomerInput,
-  UpdateCustomerInput,
-} from '@/types/customer';
+import type { Customer,CreateCustomerInput,UpdateCustomerInput,} from '@/types/customer';
+import type { Shipment } from '@/types/shipment';
 
 // AUTH
 export const authApi = {
@@ -58,10 +46,7 @@ export const employeeApi = {
   },
 
   update: async (id: string, input: UpdateEmployeeInput) => {
-    const { data } = await axios.patch<Employee>(
-      `/employees/${id}`,
-      input,
-    );
+    const { data } = await axios.patch<Employee>(`/employees/${id}`, input);
     return data;
   },
 
@@ -202,6 +187,18 @@ export const shipmentApi = {
       },
     });
 
+    return data;
+  },
+
+  list: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    customerId?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<{ data: Shipment[]; total: number; page: number; limit: number }> => {
+    const { data } = await axios.get('/shipments', { params });
     return data;
   },
 };
