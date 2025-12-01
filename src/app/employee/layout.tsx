@@ -57,7 +57,8 @@ export default function EmployeeLayout({
   }
 
   return (
-    <div className="flex h-screen bg-gray-100 text-gray-800">
+    // 1) Allow page to grow and let the browser own the scrollbar
+    <div className="flex min-h-screen bg-gray-100 text-gray-800">
       {/* Shared, role-aware sidebar */}
       <Sidebar />
 
@@ -99,7 +100,9 @@ export default function EmployeeLayout({
         </header>
 
         {/* Main CRM-style body */}
-        <main className="flex-1 w-full max-w-6xl mx-auto px-5 py-6 overflow-y-auto">
+        
+        <main className="flex-1 w-full px-5 py-6">
+          {/* Optional: keep this card wrapper, or remove it if pages handle their own cards */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 md:p-7 transition-all hover:shadow-md">
             {children}
           </div>

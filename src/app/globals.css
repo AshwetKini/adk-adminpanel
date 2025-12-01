@@ -33,3 +33,28 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.6s ease-out;
 }
+
+/* Global scrollbar styling */
+* {
+  scrollbar-width: thin;              /* Firefox */
+  scrollbar-color: #cbd5f5 transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;                         /* Chrome / Edge */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #cbd5f5;          /* slate-300-ish */
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8;          /* slate-400-ish */
+}
