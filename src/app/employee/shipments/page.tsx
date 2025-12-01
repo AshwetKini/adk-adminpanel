@@ -17,7 +17,7 @@ function formatDate(value?: string) {
   const day = String(d.getDate()).padStart(2, '0');
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const year = d.getFullYear();
-  return `${day}.${month}.${year}`; // dd.MM.yyyy
+  return `${day}.${month}.${year}`;
 }
 
 export default function EmployeeShipmentsPage() {
@@ -30,6 +30,9 @@ export default function EmployeeShipmentsPage() {
   const [search, setSearch] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+
+  const [file, setFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
 
   async function loadData(p = 1) {
     setLoading(true);
@@ -66,68 +69,135 @@ export default function EmployeeShipmentsPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  async function onImport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!file) {
+      alert('Please select an Excel file first.');
+      return;
+    }
+    setImporting(true);
+    try {
+      const res = await shipmentApi.importExcel(file);
+      alert(
+        `${res.message}. Inserted ${res.insertedCount} rows.`,
+      );
+      // Reload first page so new shipments are visible
+      await loadData(1);
+    } catch (err: any) {
+      alert(
+        err?.response?.data?.message ||
+          'Failed to import shipments',
+      );
+    } finally {
+      setImporting(false);
+    }
+  }
+
   return (
     <div className="p-4 space-y-4">
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <h1 className="text-lg font-semibold">
-            Shipments
-          </h1>
-          <form
-            onSubmit={onFilterSubmit}
-            className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
-          >
-            <div className="space-y-1">
-              <label className="text-xs font-medium">
-                Search
-              </label>
-              <Input
-                placeholder="Customer, user ID, mobile, shipment ID..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+      {/* Top row: Import + Filters */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Import card */}
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <h2 className="text-sm font-semibold">
+              Import Shipments (Excel)
+            </h2>
+            <form
+              onSubmit={onImport}
+              className="space-y-3"
+            >
+              <input
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={(e) =>
+                  setFile(e.target.files?.[0] || null)
+                }
+                className="block w-full text-xs"
               />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">
-                From date
-              </label>
-              <Input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-medium">
-                To date
-              </label>
-              <Input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button type="submit" disabled={loading}>
-                {loading ? 'Loading...' : 'Apply'}
-              </Button>
+              <p className="text-[11px] text-slate-500">
+                Supported formats: dd.MM.yyyy, dd/MM/yyyy, dd-MM-yyyy
+                in Date columns.
+              </p>
               <Button
-                type="button"
-                variant="secondary"
-                onClick={() => {
-                  setSearch('');
-                  setFromDate('');
-                  setToDate('');
-                  loadData(1);
-                }}
+                type="submit"
+                disabled={importing}
               >
-                Reset
+                {importing
+                  ? 'Importing...'
+                  : 'Import Shipments'}
               </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+            </form>
+          </CardContent>
+        </Card>
 
+        {/* Filters card spans remaining columns */}
+        <Card className="lg:col-span-2">
+          <CardContent className="p-4 space-y-3">
+            <h1 className="text-lg font-semibold">
+              Shipments
+            </h1>
+            <form
+              onSubmit={onFilterSubmit}
+              className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end"
+            >
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  Search
+                </label>
+                <Input
+                  placeholder="Customer, user ID, mobile, shipment ID..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  From date
+                </label>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) =>
+                    setFromDate(e.target.value)
+                  }
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium">
+                  To date
+                </label>
+                <Input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) =>
+                    setToDate(e.target.value)
+                  }
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={loading}>
+                  {loading ? 'Loading...' : 'Apply'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setSearch('');
+                    setFromDate('');
+                    setToDate('');
+                    loadData(1);
+                  }}
+                >
+                  Reset
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Table */}
       <Card>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -140,7 +210,9 @@ export default function EmployeeShipmentsPage() {
                   <th className="px-3 py-2 text-left">Mobile</th>
                   <th className="px-3 py-2 text-left">Shipment ID</th>
                   <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right">Net Charges</th>
+                  <th className="px-3 py-2 text-right">
+                    Net Charges
+                  </th>
                   <th className="px-3 py-2 text-left">Location</th>
                 </tr>
               </thead>

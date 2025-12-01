@@ -42,7 +42,7 @@ const employeeMenu: MenuItem[] = [
   { title: 'My Department', href: '/employee/department' },
   { title: 'Customers', href: '/employee/customers' }, // customer module
   { title: 'Shipments', href: '/employee/shipments' },
-  { title: 'Import Shipments', href: '/shipments/import' }, // new shipments import page
+  
 ];
 
 export default function Sidebar() {
@@ -100,7 +100,7 @@ export default function Sidebar() {
             ADK System
           </div>
           <div className="text-[11px] text-slate-400">
-            {tenantKey || 'Admin Panel'}
+            {/* {tenantKey || 'Admin Panel'} */}
           </div>
         </div>
       </div>
