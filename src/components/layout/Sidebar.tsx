@@ -36,11 +36,12 @@ const platformMenu: MenuItem[] = [
   { title: 'Tenants', href: '/tenants' },
 ];
 
-// UPDATED: employee sidebar menu, now includes Customers
+// Employee sidebar menu: existing customer module + new import shipments link
 const employeeMenu: MenuItem[] = [
   { title: 'My Dashboard', href: '/employee/dashboard' },
   { title: 'My Department', href: '/employee/department' },
-  { title: 'Customers', href: '/employee/customers' }, // wire customer module here
+  { title: 'Customers', href: '/employee/customers' }, // customer module
+  { title: 'Import Shipments', href: '/shipments/import' }, // new shipments import page
 ];
 
 export default function Sidebar() {
