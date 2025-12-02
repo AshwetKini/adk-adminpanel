@@ -127,9 +127,14 @@ export default function EmployeeCustomersPage() {
                   {list.map((c) => (
                     <tr
                       key={c._id ?? c.customerId}
-                      className="border-b last:border-0"
+                      className="border-b last:border-0 cursor-pointer hover:bg-slate-50"
+                      onClick={() =>
+                        router.push(`/employee/customers/${c._id}`)
+                      }
                     >
-                      <td className="py-2 px-3">{c.customerId}</td>
+                      <td className="py-2 px-3 text-blue-700 underline">
+                        {c.customerId}
+                      </td>
                       <td className="py-2 px-3">{c.fullName}</td>
                       <td className="py-2 px-3">{c.companyName || '-'}</td>
                       <td className="py-2 px-3">{c.mobileNumber}</td>
