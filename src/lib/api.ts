@@ -2,11 +2,31 @@
 
 import axios from './axios';
 import type { LoginResponse } from '@/types/auth';
-import type { Employee,CreateEmployeeInput,UpdateEmployeeInput,} from '@/types/employee';
-import type { Department,CreateDepartmentInput,UpdateDepartmentInput,} from '@/types/department';
+import type {
+  Employee,
+  CreateEmployeeInput,
+  UpdateEmployeeInput,
+} from '@/types/employee';
+import type {
+  Department,
+  CreateDepartmentInput,
+  UpdateDepartmentInput,
+} from '@/types/department';
 import type { Tenant } from '@/types/tenant';
-import type { Customer,CreateCustomerInput,UpdateCustomerInput,} from '@/types/customer';
+import type {
+  Customer,
+  CreateCustomerInput,
+  UpdateCustomerInput,
+} from '@/types/customer';
 import type { Shipment } from '@/types/shipment';
+
+// Generic paged result type (used by customers, shipments, etc.)
+export interface PagedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
 // AUTH
 export const authApi = {
@@ -46,7 +66,10 @@ export const employeeApi = {
   },
 
   update: async (id: string, input: UpdateEmployeeInput) => {
-    const { data } = await axios.patch<Employee>(`/employees/${id}`, input);
+    const { data } = await axios.patch<Employee>(
+      `/employees/${id}`,
+      input,
+    );
     return data;
   },
 
@@ -95,7 +118,11 @@ export const tenantApi = {
     return data;
   },
 
-  create: async (input: { key: string; name: string; isActive?: boolean }) => {
+  create: async (input: {
+    key: string;
+    name: string;
+    isActive?: boolean;
+  }) => {
     const { data } = await axios.post<Tenant>('/tenants', input);
     return data;
   },
@@ -136,8 +163,15 @@ export const tenantApi = {
 
 // CUSTOMERS
 export const customerApi = {
-  all: async () => {
-    const { data } = await axios.get<Customer[]>('/customers');
+  // Server-side search + pagination
+  all: async (params?: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  }): Promise<PagedResult<Customer>> => {
+    const { data } = await axios.get<PagedResult<Customer>>('/customers', {
+      params,
+    });
     return data;
   },
 
@@ -197,8 +231,11 @@ export const shipmentApi = {
     customerId?: string;
     fromDate?: string;
     toDate?: string;
-  }): Promise<{ data: Shipment[]; total: number; page: number; limit: number }> => {
-    const { data } = await axios.get('/shipments', { params });
+  }): Promise<PagedResult<Shipment>> => {
+    const { data } = await axios.get<PagedResult<Shipment>>(
+      '/shipments',
+      { params },
+    );
     return data;
   },
 };
