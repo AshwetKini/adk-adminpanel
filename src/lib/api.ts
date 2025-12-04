@@ -238,4 +238,9 @@ export const shipmentApi = {
     );
     return data;
   },
+
+  get: async (id: string): Promise<Shipment> => {
+    const { data } = await axios.get<Shipment>(`/shipments/${id}`);
+    return data;
+  },
 };

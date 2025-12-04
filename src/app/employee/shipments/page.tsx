@@ -8,6 +8,7 @@ import type { Shipment } from '@/types/shipment';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
+import { useRouter } from 'next/navigation';
 
 // Always display dates as dd/MM/yyyy
 function formatDate(value?: string) {
@@ -21,6 +22,8 @@ function formatDate(value?: string) {
 }
 
 export default function EmployeeShipmentsPage() {
+  
+   const router = useRouter();
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -33,6 +36,7 @@ export default function EmployeeShipmentsPage() {
 
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
+
 
   async function loadData(p = 1) {
     setLoading(true);
@@ -296,12 +300,11 @@ export default function EmployeeShipmentsPage() {
                 )}
                 {shipments.map((s, index) => (
                   <tr
-                    key={s._id}
-                    className={
-                      index % 2 === 0
-                        ? 'hover:bg-slate-50'
-                        : 'bg-slate-50/40 hover:bg-slate-100'
-                    }
+                   key={s.id ?? `${s.shipmentId ?? 'shipment'}-${index}`}
+      onClick={() => router.push(`/employee/shipments/${s.id}`)}
+      className={`cursor-pointer ${
+        index % 2 === 0 ? 'bg-slate-50/40' : ''
+      } hover:bg-slate-100`}
                   >
                     <td className="px-3 py-2 text-xs text-slate-700">
                       {formatDate(s.date)}
