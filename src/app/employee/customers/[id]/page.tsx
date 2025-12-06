@@ -77,7 +77,9 @@ export default function EmployeeCustomerDetailPage() {
       <div className="mx-auto max-w-5xl px-4 py-10">
         <Card>
           <CardContent className="py-6">
-            <p className="text-sm text-gray-600">Loading customer details...</p>
+            <p className="text-sm text-gray-600">
+              Loading customer details...
+            </p>
           </CardContent>
         </Card>
       </div>
@@ -90,7 +92,9 @@ export default function EmployeeCustomerDetailPage() {
         <Card>
           <CardContent className="flex items-center justify-between gap-4 py-6">
             <div>
-              <h1 className="text-lg font-semibold">Customer not found</h1>
+              <h1 className="text-lg font-semibold">
+                Customer not found
+              </h1>
               <p className="mt-1 text-xs text-gray-500">
                 This customer may have been removed or the link is invalid.
               </p>
@@ -130,14 +134,14 @@ export default function EmployeeCustomerDetailPage() {
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Mobile:{' '}
+            Mobile{' '}
             <span className="font-medium text-slate-800">
               {customer.mobileNumber}
             </span>
             {customer.companyName && (
               <>
                 {' · '}
-                Company:{' '}
+                Company{' '}
                 <span className="font-medium text-slate-800">
                   {customer.companyName}
                 </span>

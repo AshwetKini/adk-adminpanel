@@ -6,7 +6,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { shipmentApi } from '@/lib/api';
 import type { Shipment } from '@/types/shipment';
 import { Card, CardContent } from '@/components/ui/Card';
-
 import { Button } from '@/components/ui/Button';
 
 function formatDate(value?: string) {
@@ -35,10 +34,19 @@ function Detail({ label, value }: DetailProps) {
   );
 }
 
+// Extend Shipment locally with new composite + breakdown fields
+type ShipmentDetail = Shipment & {
+  pcsRaw?: string;
+  pcsParts?: number[];
+  rateRaw?: string;
+  rateParts?: number[];
+  detailItems?: { name: string; qty: number }[];
+};
+
 export default function EmployeeShipmentDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const [shipment, setShipment] = useState<Shipment | null>(null);
+  const [shipment, setShipment] = useState<ShipmentDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -49,7 +57,7 @@ export default function EmployeeShipmentDetailPage() {
       setLoading(true);
       try {
         const data = await shipmentApi.get(id);
-        setShipment(data);
+        setShipment(data as ShipmentDetail);
       } catch (err: any) {
         alert(err?.response?.data?.message ?? 'Failed to load shipment');
         router.push('/employee/shipments');
@@ -100,13 +108,24 @@ export default function EmployeeShipmentDetailPage() {
             <Detail label="SO No." value={shipment.soNo} />
             <Detail label="Item" value={shipment.itemName} />
             <Detail label="CTNs" value={shipment.ctns} />
-            <Detail label="PCS" value={shipment.pcs} />
+            {/* Use raw PCS expression when available */}
+            <Detail
+              label="PCS"
+              value={shipment.pcsRaw ?? shipment.pcs}
+            />
             <Detail label="KGS" value={shipment.kgs} />
             <Detail label="CBM" value={shipment.cbm} />
             <Detail label="Value" value={shipment.value} />
-            <Detail label="Rate" value={shipment.rate} />
+            {/* Use raw Rate expression when available */}
+            <Detail
+              label="Rate"
+              value={shipment.rateRaw ?? shipment.rate}
+            />
             <Detail label="Amount" value={shipment.amount} />
-            <Detail label="Security Deposit" value={shipment.securityDeposit} />
+            <Detail
+              label="Security Deposit"
+              value={shipment.securityDeposit}
+            />
             <Detail
               label="Charges on Deposit"
               value={shipment.chargesOnDeposit}
@@ -153,6 +172,22 @@ export default function EmployeeShipmentDetailPage() {
               value={shipment.deliveryLocation}
             />
           </div>
+
+          {/* Optional PCS breakdown list */}
+          {shipment.detailItems && shipment.detailItems.length > 0 && (
+            <div className="mt-4 border-t border-slate-100 pt-3">
+              <div className="text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                PCS Breakdown
+              </div>
+              <ul className="mt-1 space-y-1 text-sm text-slate-800">
+                {shipment.detailItems.map((d) => (
+                  <li key={d.name}>
+                    {d.name}: {d.qty}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {shipment.remarks && (
             <div className="mt-4 border-t border-slate-100 pt-3">
