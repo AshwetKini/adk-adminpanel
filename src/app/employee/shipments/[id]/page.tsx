@@ -40,7 +40,8 @@ type ShipmentDetail = Shipment & {
   pcsParts?: number[];
   rateRaw?: string;
   rateParts?: number[];
-  detailItems?: { name: string; qty: number }[];
+  // include _id so we can use it as a unique React key when present
+  detailItems?: { _id?: string; name: string; qty: number }[];
 };
 
 export default function EmployeeShipmentDetailPage() {
@@ -180,8 +181,10 @@ export default function EmployeeShipmentDetailPage() {
                 PCS Breakdown
               </div>
               <ul className="mt-1 space-y-1 text-sm text-slate-800">
-                {shipment.detailItems.map((d) => (
-                  <li key={d.name}>
+                {shipment.detailItems.map((d, index) => (
+                  <li
+                    key={d._id ?? `${d.name}-${d.qty}-${index}`}
+                  >
                     {d.name}: {d.qty}
                   </li>
                 ))}
