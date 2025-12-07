@@ -243,4 +243,18 @@ export const shipmentApi = {
     const { data } = await axios.get<Shipment>(`/shipments/${id}`);
     return data;
   },
+
+  // NEW: update existing shipment
+  update: async (
+    id: string,
+    input: Partial<Shipment>,
+  ): Promise<Shipment> => {
+    const { data } = await axios.patch<Shipment>(`/shipments/${id}`, input);
+    return data;
+  },
+
+  // NEW: delete shipment
+  remove: async (id: string): Promise<void> => {
+    await axios.delete(`/shipments/${id}`);
+  },
 };
