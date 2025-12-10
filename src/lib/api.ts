@@ -66,10 +66,7 @@ export const employeeApi = {
   },
 
   update: async (id: string, input: UpdateEmployeeInput) => {
-    const { data } = await axios.patch<Employee>(
-      `/employees/${id}`,
-      input,
-    );
+    const { data } = await axios.patch<Employee>(`/employees/${id}`, input);
     return data;
   },
 
@@ -256,5 +253,107 @@ export const shipmentApi = {
   // NEW: delete shipment
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/shipments/${id}`);
+  },
+};
+
+// =======================
+// PAYMENTS / RECEIVABLES
+// =======================
+
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
+
+export interface Payment {
+  id: string;
+  date: string;
+  amount: number;
+  method: string;
+  reference?: string;
+  note?: string;
+  collectedByEmployeeId?: string;
+  collectedByEmployeeName?: string;
+  createdAt: string;
+}
+
+export interface PaymentAccount {
+  id: string;
+  shipmentId: string;
+  shipmentMongoId: string;
+  customerId: string;
+  customerName: string;
+  userId: string;
+  mobileNumber?: string;
+  invoiceAmount: number;
+  totalPaid: number;
+  balance: number;
+  status: PaymentStatus;
+  invoiceDate?: string;
+  dueDate?: string;
+  lastPaymentDate?: string;
+  ageDays?: number | null;
+  payments: Payment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentSummary {
+  unpaid: number;
+  partiallyPaid: number;
+  paid: number;
+  overdue: number;
+  totalReceivable: number;
+}
+
+export const paymentApi = {
+  getSummary: async (): Promise<PaymentSummary> => {
+    const { data } = await axios.get<PaymentSummary>('/payments/summary');
+    return data;
+  },
+
+  queryAccounts: async (params?: {
+    status?: PaymentStatus | '';
+    customerId?: string;
+    shipmentId?: string;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    search?: string;
+  }): Promise<PaymentAccount[]> => {
+    const { data } = await axios.get<PaymentAccount[]>('/payments/accounts', {
+      params,
+    });
+    return data;
+  },
+
+  getAccount: async (shipmentId: string): Promise<PaymentAccount> => {
+    const { data } = await axios.get<PaymentAccount>(
+      `/payments/accounts/${shipmentId}`,
+    );
+    return data;
+  },
+
+  recordPayment: async (
+    shipmentId: string,
+    input: {
+      amount: number;
+      date?: string;
+      method: string;
+      reference?: string;
+      note?: string;
+    },
+  ): Promise<PaymentAccount> => {
+    const { data } = await axios.post<PaymentAccount>(
+      `/payments/accounts/${shipmentId}/payments`,
+      input,
+    );
+    return data;
+  },
+
+  deletePayment: async (
+    shipmentId: string,
+    paymentId: string,
+  ): Promise<PaymentAccount> => {
+    const { data } = await axios.delete<PaymentAccount>(
+      `/payments/accounts/${shipmentId}/payments/${paymentId}`,
+    );
+    return data;
   },
 };

@@ -29,6 +29,7 @@ const tenantMenu: MenuItem[] = [
   { title: 'Dashboard', href: '/dashboard' },
   { title: 'Employees', href: '/employees' },
   { title: 'Departments', href: '/departments' },
+  { title: 'Payments', href: '/payments' },
 ];
 
 const platformMenu: MenuItem[] = [
@@ -42,6 +43,7 @@ const employeeMenu: MenuItem[] = [
   { title: 'My Department', href: '/employee/department' },
   { title: 'Customers', href: '/employee/customers' }, // customer module
   { title: 'Shipments', href: '/employee/shipments' },
+  { title: 'Payments', href: '/payments' },
   
 ];
 
