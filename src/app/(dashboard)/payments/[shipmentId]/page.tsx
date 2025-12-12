@@ -447,19 +447,20 @@ export default function PaymentDetailPage() {
                 className="mb-3 grid gap-3 rounded-lg bg-slate-50 p-4 text-xs md:grid-cols-2"
               >
                 <div>
-                  <label className="mb-1 block font-medium text-slate-700">
-                    Amount *
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    required
-                    value={form.amount}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, amount: e.target.value }))
-                    }
-                    className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
-                  />
+                    <label className="mb-1 block font-medium text-slate-700">
+                        Amount
+                     </label>
+                        <input
+                          type="text"
+                            inputMode="decimal"
+                                   required
+                              value={form.amount}
+                        onChange={(e) =>
+                          setForm((prev) => ({ ...prev, amount: e.target.value }))
+                        }
+                      className="w-full rounded border border-slate-300 px-3 py-2 text-sm"
+                    />
+
                 </div>
                 <div>
                   <label className="mb-1 block font-medium text-slate-700">
