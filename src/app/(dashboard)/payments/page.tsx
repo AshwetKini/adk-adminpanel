@@ -234,7 +234,7 @@ export default function PaymentsPage() {
               <Th align="right">Paid</Th>
               <Th align="right">Balance</Th>
               <Th align="center">Status</Th>
-              <Th align="center">Age</Th>
+              <Th align="center">Reciept Days</Th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
