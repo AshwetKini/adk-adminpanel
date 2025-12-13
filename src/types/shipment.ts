@@ -94,4 +94,7 @@ export interface Shipment {
 
   // Full line items array
   lineItems?: LineItem[];
+
+  shipmentType?: string;
+containerNo?: string;
 }

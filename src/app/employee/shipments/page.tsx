@@ -4,43 +4,10 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { shipmentApi } from '@/lib/api';
-import type { Shipment } from '@/types/shipment';
+import { shipmentApi, type ContainerSummary } from '@/lib/api';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-
-// Extend Shipment type locally to include lineItems from the backend
-type ShipmentWithLines = Shipment & {
-  lineItems?: {
-    soNo?: string;
-    ctns?: number;
-    itemName?: string;
-    value?: number;
-    pcsRaw?: string;
-    pcs?: number;
-    pcsParts?: number[];
-    rateRaw?: string;
-    rate?: number;
-    rateParts?: number[];
-    kgs?: number;
-    cbm?: number;
-    mark?: string;
-    unit?: string;
-    amount?: number;
-    securityDeposit?: number;
-    chargesOnDeposit?: number;
-    depositCharges?: number;
-    localTransportCharges?: number;
-    outstationTransportCharges?: number;
-    packingCharges?: number;
-    gstBillingCharges?: number;
-    extraChargesIfAny?: number;
-    discountIfAny?: number;
-    totalNetCharges?: number;
-    detailItems?: { name: string; qty: number }[];
-  }[];
-};
 
 // Always display dates as dd/MM/yyyy
 function formatDate(value?: string) {
@@ -53,23 +20,19 @@ function formatDate(value?: string) {
   return `${day}/${month}/${year}`;
 }
 
-// helpers for lineItems-based model
-function getFirstLineItem(s: ShipmentWithLines) {
-  return s.lineItems && s.lineItems.length > 0 ? s.lineItems[0] : null;
-}
-
-function getTotalNetCharges(s: ShipmentWithLines) {
-  if (!s.lineItems || s.lineItems.length === 0) return undefined;
-  return s.lineItems.reduce(
-    (sum, li) => sum + (li.totalNetCharges ?? 0),
-    0,
-  );
+function formatShipmentTypes(types: (string | null | undefined)[]) {
+  if (!types || types.length === 0) return '-';
+  const cleaned = types.map((t) => (t ?? '').trim()).filter(Boolean);
+  if (!cleaned.length) return '-';
+  return Array.from(new Set(cleaned)).join(', ');
 }
 
 export default function EmployeeShipmentsPage() {
   const router = useRouter();
-  const [shipments, setShipments] = useState<ShipmentWithLines[]>([]);
+
+  const [containers, setContainers] = useState<ContainerSummary[]>([]);
   const [loading, setLoading] = useState(false);
+
   const [page, setPage] = useState(1);
   const [limit] = useState(20);
   const [total, setTotal] = useState(0);
@@ -84,20 +47,19 @@ export default function EmployeeShipmentsPage() {
   async function loadData(p = 1) {
     setLoading(true);
     try {
-      const result = await shipmentApi.list({
+      const result = await shipmentApi.listContainers({
         page: p,
         limit,
         search: search || undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
       });
-      setShipments(result.data as ShipmentWithLines[]);
+
+      setContainers(result.data);
       setTotal(result.total);
       setPage(result.page);
     } catch (err: any) {
-      alert(
-        err?.response?.data?.message || 'Failed to load shipments',
-      );
+      alert(err?.response?.data?.message || 'Failed to load containers');
     } finally {
       setLoading(false);
     }
@@ -127,9 +89,7 @@ export default function EmployeeShipmentsPage() {
       alert(`${res.message}. Inserted ${res.insertedCount} rows.`);
       await loadData(1);
     } catch (err: any) {
-      alert(
-        err?.response?.data?.message || 'Failed to import shipments',
-      );
+      alert(err?.response?.data?.message || 'Failed to import shipments');
     } finally {
       setImporting(false);
     }
@@ -171,7 +131,7 @@ export default function EmployeeShipmentsPage() {
 
       {/* Top row: Import + Filters */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* Import card */}
+        {/* Import card (KEEP EXACTLY AS IS) */}
         <Card className="border border-slate-200 bg-white shadow-sm">
           <CardContent className="space-y-4 p-5 md:p-6">
             <div className="flex items-center justify-between gap-2">
@@ -192,9 +152,7 @@ export default function EmployeeShipmentsPage() {
                 <input
                   type="file"
                   accept=".xlsx,.xls"
-                  onChange={(e) =>
-                    setFile(e.target.files?.[0] || null)
-                  }
+                  onChange={(e) => setFile(e.target.files?.[0] || null)}
                   className="block w-full cursor-pointer rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:border-slate-400"
                 />
               </div>
@@ -286,63 +244,65 @@ export default function EmployeeShipmentsPage() {
             <table className="min-w-full table-auto text-sm">
               <thead className="sticky top-0 z-10 bg-slate-50 text-xs font-medium uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-3 py-2 text-left">Date</th>
-                  <th className="px-3 py-2 text-left">Customer</th>
-                  <th className="px-3 py-2 text-left">User ID</th>
-                  <th className="px-3 py-2 text-left">Mobile</th>
-                  <th className="px-3 py-2 text-left">Shipment ID</th>
-                  <th className="px-3 py-2 text-left">Item</th>
-                  <th className="px-3 py-2 text-right">Net charges</th>
-                  <th className="px-3 py-2 text-left">Location</th>
+                  <th className="px-3 py-2 text-left">Container No</th>
+                  <th className="px-3 py-2 text-right">Shipment count</th>
+                  <th className="px-3 py-2 text-right">Total net</th>
+                  <th className="px-3 py-2 text-left">Shipment type(s)</th>
+                  <th className="px-3 py-2 text-left">Last date</th>
                 </tr>
               </thead>
+
               <tbody className="divide-y divide-slate-100 bg-white">
-                {shipments.length === 0 && !loading && (
+                {containers.length === 0 && !loading && (
                   <tr>
                     <td
-                      colSpan={8}
+                      colSpan={5}
                       className="px-3 py-8 text-center text-sm text-slate-500"
                     >
-                      No shipments found for the selected filters.
+                      No containers found for the selected filters.
                     </td>
                   </tr>
                 )}
-                {shipments.map((s, index) => {
-                  const first = getFirstLineItem(s);
-                  const net = getTotalNetCharges(s);
+
+                {containers.map((c, index) => {
+                  const lastDate = c.lastDate ?? c.lastCreatedAt;
+
                   return (
                     <tr
-                      key={s.id ?? `${s.shipmentId ?? 'shipment'}-${index}`}
+                      key={c.containerNo || `container-${index}`}
                       onClick={() =>
-                        router.push(`/employee/shipments/${s.id}`)
+                        router.push(
+                          `/employee/shipments/container/${encodeURIComponent(
+                            c.containerNo,
+                          )}`,
+                        )
                       }
                       className={`cursor-pointer ${
                         index % 2 === 0 ? 'bg-slate-50/40' : ''
                       } hover:bg-slate-100`}
                     >
-                      <td className="px-3 py-2 text-xs text-slate-700">
-                        {formatDate(s.date)}
+                      <td className="px-3 py-2 text-sm font-mono text-slate-800">
+                        {c.containerNo || '-'}
                       </td>
-                      <td className="max-w-[200px] truncate px-3 py-2 text-sm font-medium text-slate-900">
-                        {s.customerName}
+
+                      <td className="px-3 py-2 text-right text-sm text-slate-800">
+                        {c.shipmentCount != null
+                          ? c.shipmentCount.toLocaleString()
+                          : '-'}
                       </td>
-                      <td className="px-3 py-2 text-xs text-slate-700">
-                        {s.userId}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-slate-700">
-                        {s.mobileNumber}
-                      </td>
-                      <td className="px-3 py-2 text-xs font-mono text-slate-700">
-                        {s.shipmentId}
-                      </td>
-                      <td className="max-w-[220px] truncate px-3 py-2 text-sm text-slate-700">
-                        {first?.itemName ?? '-'}
-                      </td>
+
                       <td className="px-3 py-2 text-right text-sm font-semibold text-slate-900">
-                        {net != null ? net.toLocaleString() : '-'}
+                        {c.totalNetCharges != null
+                          ? c.totalNetCharges.toLocaleString()
+                          : '-'}
                       </td>
+
                       <td className="px-3 py-2 text-xs text-slate-700">
-                        {s.deliveryLocation}
+                        {formatShipmentTypes(c.shipmentTypes)}
+                      </td>
+
+                      <td className="px-3 py-2 text-xs text-slate-700">
+                        {formatDate(lastDate)}
                       </td>
                     </tr>
                   );
@@ -356,18 +316,19 @@ export default function EmployeeShipmentsPage() {
             <span>
               Showing{' '}
               <span className="font-medium">
-                {shipments.length ? (page - 1) * limit + 1 : 0}
+                {containers.length ? (page - 1) * limit + 1 : 0}
               </span>{' '}
               –{' '}
               <span className="font-medium">
-                {(page - 1) * limit + shipments.length}
+                {(page - 1) * limit + containers.length}
               </span>{' '}
               of{' '}
               <span className="font-medium">
                 {total.toLocaleString()}
               </span>{' '}
-              shipments
+              containers
             </span>
+
             <div className="flex items-center justify-end gap-2">
               <span className="hidden text-[11px] text-slate-500 sm:inline">
                 Page {page} of {totalPages}

@@ -1,23 +1,29 @@
 // src/lib/api.ts
 
 import axios from './axios';
+
 import type { LoginResponse } from '@/types/auth';
+
 import type {
   Employee,
   CreateEmployeeInput,
   UpdateEmployeeInput,
 } from '@/types/employee';
+
 import type {
   Department,
   CreateDepartmentInput,
   UpdateDepartmentInput,
 } from '@/types/department';
+
 import type { Tenant } from '@/types/tenant';
+
 import type {
   Customer,
   CreateCustomerInput,
   UpdateCustomerInput,
 } from '@/types/customer';
+
 import type { Shipment } from '@/types/shipment';
 
 // Generic paged result type (used by customers, shipments, etc.)
@@ -27,6 +33,16 @@ export interface PagedResult<T> {
   page: number;
   limit: number;
 }
+
+// ✅ NEW: Container summary type (for /shipments/containers)
+export type ContainerSummary = {
+  containerNo: string;
+  shipmentTypes: (string | null | undefined)[];
+  shipmentCount: number;
+  totalNetCharges: number;
+  lastDate?: string;
+  lastCreatedAt?: string;
+};
 
 // AUTH
 export const authApi = {
@@ -228,11 +244,45 @@ export const shipmentApi = {
     customerId?: string;
     fromDate?: string;
     toDate?: string;
+    // ✅ NEW: optional container filter (used by listByContainer)
+    containerNo?: string;
   }): Promise<PagedResult<Shipment>> => {
     const { data } = await axios.get<PagedResult<Shipment>>(
       '/shipments',
       { params },
     );
+    return data;
+  },
+
+  // ✅ NEW: container wise list (aggregated)
+  listContainers: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<PagedResult<ContainerSummary>> => {
+    const { data } = await axios.get<PagedResult<ContainerSummary>>(
+      '/shipments/containers',
+      { params },
+    );
+    return data;
+  },
+
+  // ✅ NEW: shipments inside a container (reuses /shipments with containerNo query param)
+  listByContainer: async (
+    containerNo: string,
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ): Promise<PagedResult<Shipment>> => {
+    const { data } = await axios.get<PagedResult<Shipment>>('/shipments', {
+      params: { ...params, containerNo },
+    });
     return data;
   },
 
