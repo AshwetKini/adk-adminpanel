@@ -175,9 +175,7 @@ export default function PaymentsPage() {
             <Filter className="h-3.5 w-3.5" />
             Filters
           </div>
-          <div className="hidden items-center gap-2 text-[11px] text-slate-500 sm:flex">
-            <span>Status and global search are applied server-side.</span>
-          </div>
+        
         </div>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center">
