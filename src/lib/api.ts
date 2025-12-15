@@ -34,13 +34,29 @@ export interface PagedResult<T> {
   limit: number;
 }
 
-// ✅ NEW: Container summary type (for /shipments/containers)
+export type ContainerStatus =
+  | 'Order Placed'
+  | 'Order Confirmed'
+  | 'In Transit'
+  | 'Out for Delivery'
+  | 'Delivered'
+  | 'Arrived at Warehouse'
+  | 'Departed from Warehouse'
+  | 'Delivery Delayed';
+
+
+// Container summary type (for /shipments/containers)
 export type ContainerSummary = {
   containerNo: string;
   shipmentTypes: (string | null | undefined)[];
   shipmentCount: number;
   totalNetCharges: number;
   lastDate?: string;
+  status?: ContainerStatus;
+  currentLocation?: string;
+  expectedDeliveryDate?: string;
+  statusUpdatedAt?: string;
+  trackingRemarks?: string;
   lastCreatedAt?: string;
 };
 
@@ -304,6 +320,32 @@ export const shipmentApi = {
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/shipments/${id}`);
   },
+
+    updateContainerStatus: async (
+    containerNo: string,
+    payload: {
+      status: ContainerStatus;
+      currentLocation?: string;
+      expectedDeliveryDate?: string;
+      remarks?: string;
+    },
+  ): Promise<{
+    id: string;
+    containerNo: string;
+    status: ContainerStatus;
+    currentLocation?: string;
+    expectedDeliveryDate?: string;
+    remarks?: string;
+    updatedAt?: string;
+  }> => {
+    const { data } = await axios.patch(
+      `/shipments/containers/${encodeURIComponent(containerNo)}/status`,
+      payload,
+    );
+    return data;
+  },
+
+
 };
 
 // =======================
