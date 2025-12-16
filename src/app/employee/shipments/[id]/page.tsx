@@ -184,6 +184,13 @@ export default function EmployeeShipmentDetailPage() {
               label="Delivery Location"
               value={shipment.deliveryLocation}
             />
+            <Detail label="Shipment type" value={shipment.shipmentType} />
+            <Detail label="Container No" value={shipment.containerNo} />
+            <Detail label="Container status" value={shipment.containerStatus} />
+            <Detail label="Container current location" value={shipment.containerCurrentLocation} />
+            <Detail label="Expected Delivery Date" value={formatDate(shipment.containerExpectedDeliveryDate)} />
+            <Detail label="Container status updated" value={formatDate(shipment.containerStatusUpdatedAt)} />
+            <Detail label="Container remarks" value={shipment.containerTrackingRemarks} />
           </div>
 
           {/* Optional PCS breakdown list */}

@@ -124,14 +124,16 @@ export default function ContainerShipmentsPage() {
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Customer</th>
                   <th className="px-3 py-2 text-left">Shipment ID</th>
-                  <th className="px-3 py-2 text-left">Shipment type</th>
+                  {/* <th className="px-3 py-2 text-left">Shipment type</th> */}
+                  <th className="px-3 py-2 text-left">Container status</th>
                   <th className="px-3 py-2 text-left">Location</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
                 {shipments.length === 0 && !loading ? (
                   <tr>
-                    <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-500">
+                    {/* <td colSpan={5} className="px-3 py-8 text-center text-sm text-slate-500"> */}
+                    <td colSpan={6} className="px-3 py-8 text-center text-sm text-slate-500">
                       No shipments found in this container.
                     </td>
                   </tr>
@@ -152,6 +154,12 @@ export default function ContainerShipmentsPage() {
                       <td className="px-3 py-2 text-xs text-slate-700">
                         {s.shipmentType ?? '-'}
                       </td>
+                      <td className="px-3 py-2 text-xs text-slate-700">
+                           {s.containerStatus ?? '-'}
+                       <div className="text-11px text-slate-500">
+                     {s.containerCurrentLocation ?? '-'}
+       </div>
+     </td>
                       <td className="px-3 py-2 text-xs text-slate-700">
                         {s.deliveryLocation ?? '-'}
                       </td>
