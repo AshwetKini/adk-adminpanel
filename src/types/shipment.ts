@@ -108,7 +108,7 @@ export interface Shipment {
   shipmentType?: string;
   containerNo?: string;
 
-  // NEW: denormalized container tracking fields (cascade from container status update)
+  // denormalized container tracking fields (cascade from container status update)
   containerStatus?: ContainerStatus;
   containerCurrentLocation?: string;
   containerExpectedDeliveryDate?: string;
