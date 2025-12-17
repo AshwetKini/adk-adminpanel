@@ -1,6 +1,5 @@
-
 export interface DetailItem {
-  _id: string;  
+  _id: string;
   name: string;
   qty: number;
 }
@@ -31,8 +30,19 @@ export interface LineItem {
   extraChargesIfAny?: number;
   discountIfAny?: number;
   totalNetCharges?: number;
-  detailItems?: DetailItem[];  
+  detailItems?: DetailItem[];
 }
+
+// Container Status Union Type (match backend enum values exactly)
+export type ContainerStatus =
+  | 'Order Placed'
+  | 'Order Confirmed'
+  | 'In Transit'
+  | 'Arrived at Warehouse'
+  | 'Departed from Warehouse'
+  | 'Out for Delivery'
+  | 'Delivered'
+  | 'Delivery Delayed';
 
 export interface Shipment {
   // Core Identifiers
@@ -89,9 +99,19 @@ export interface Shipment {
   createdAt?: string;
   updatedAt?: string;
 
-  //  Detail Items with unique _id field
+  // Detail Items with unique _id field
   detailItems?: DetailItem[];
 
   // Full line items array
   lineItems?: LineItem[];
+
+  shipmentType?: string;
+  containerNo?: string;
+
+  // denormalized container tracking fields (cascade from container status update)
+  containerStatus?: ContainerStatus;
+  containerCurrentLocation?: string;
+  containerExpectedDeliveryDate?: string;
+  containerTrackingRemarks?: string;
+  containerStatusUpdatedAt?: string;
 }

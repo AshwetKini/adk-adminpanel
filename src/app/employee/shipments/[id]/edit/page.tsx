@@ -1,4 +1,3 @@
-// src/app/employee/shipments/[id]/edit/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -41,7 +40,24 @@ type FormState = {
   receiptDate: string;
   deliveryLocation: string;
   remarks: string;
+  // NEW: container tracking fields
+  containerStatus: string;
+  containerCurrentLocation: string;
+  containerExpectedDeliveryDate: string;
+  containerTrackingRemarks: string;
 };
+
+// ADD: Container status options
+const CONTAINER_STATUS_OPTIONS = [
+  'Order Placed',
+  'Order Confirmed',
+  'In Transit',
+  'Arrived at Warehouse',
+  'Departed from Warehouse',
+  'Out for Delivery',
+  'Delivered',
+  'Delivery Delayed',
+];
 
 function toNumberOrUndefined(v: string): number | undefined {
   if (!v.trim()) return undefined;
@@ -105,6 +121,13 @@ export default function EditEmployeeShipmentPage() {
           receiptDate: toInputDate(data.receiptDate),
           deliveryLocation: data.deliveryLocation ?? '',
           remarks: data.remarks ?? '',
+          // NEW: populate container tracking fields
+          containerStatus: data.containerStatus ?? 'Order Placed',
+          containerCurrentLocation: data.containerCurrentLocation ?? '',
+          containerExpectedDeliveryDate: toInputDate(
+            data.containerExpectedDeliveryDate,
+          ),
+          containerTrackingRemarks: data.containerTrackingRemarks ?? '',
         });
       } catch (err: any) {
         alert(err?.response?.data?.message ?? 'Failed to load shipment');
@@ -117,7 +140,11 @@ export default function EditEmployeeShipmentPage() {
 
   const handleChange =
     (field: keyof FormState) =>
-    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    (
+      e: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >,
+    ) => {
       if (!form) return;
       setForm({ ...form, [field]: e.target.value });
     };
@@ -157,6 +184,12 @@ export default function EditEmployeeShipmentPage() {
         receiptDate: form.receiptDate || undefined,
         deliveryLocation: form.deliveryLocation || undefined,
         remarks: form.remarks || undefined,
+        // NEW: send container tracking overrides
+        containerStatus: form.containerStatus || undefined,
+        containerCurrentLocation: form.containerCurrentLocation || undefined,
+        containerExpectedDeliveryDate:
+          form.containerExpectedDeliveryDate || undefined,
+        containerTrackingRemarks: form.containerTrackingRemarks || undefined,
       };
 
       await shipmentApi.update(params.id, payload);
@@ -435,6 +468,68 @@ export default function EditEmployeeShipmentPage() {
                   className="min-h-[80px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
                   value={form.remarks}
                   onChange={handleChange('remarks')}
+                />
+              </div>
+
+              {/* ============== NEW: Container Tracking Section ============== */}
+              <div className="md:col-span-2 border-t border-slate-200 pt-4 mt-4">
+                <h3 className="text-sm font-semibold text-slate-900 mb-3">
+                  Container Tracking (Individual Override)
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">
+                  Override the container's status for this specific shipment.
+                  Leave empty to use container's values.
+                </p>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Container Status
+                </label>
+                <select
+                  value={form.containerStatus}
+                  onChange={handleChange('containerStatus')}
+                  className="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                >
+                  {CONTAINER_STATUS_OPTIONS.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Container Current Location
+                </label>
+                <Input
+                  placeholder="e.g., Mumbai Port, Delhi Warehouse"
+                  value={form.containerCurrentLocation}
+                  onChange={handleChange('containerCurrentLocation')}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-700">
+                  Container Expected Delivery Date
+                </label>
+                <Input
+                  type="date"
+                  value={form.containerExpectedDeliveryDate}
+                  onChange={handleChange('containerExpectedDeliveryDate')}
+                />
+              </div>
+
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-xs font-medium text-slate-700">
+                  Container Remarks
+                </label>
+                <textarea
+                  className="min-h-[90px] w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  placeholder="Optional notes specific to this shipment within the container..."
+                  value={form.containerTrackingRemarks}
+                  onChange={handleChange('containerTrackingRemarks')}
                 />
               </div>
             </div>

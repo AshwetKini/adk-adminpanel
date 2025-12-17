@@ -1,23 +1,29 @@
 // src/lib/api.ts
 
 import axios from './axios';
+
 import type { LoginResponse } from '@/types/auth';
+
 import type {
   Employee,
   CreateEmployeeInput,
   UpdateEmployeeInput,
 } from '@/types/employee';
+
 import type {
   Department,
   CreateDepartmentInput,
   UpdateDepartmentInput,
 } from '@/types/department';
+
 import type { Tenant } from '@/types/tenant';
+
 import type {
   Customer,
   CreateCustomerInput,
   UpdateCustomerInput,
 } from '@/types/customer';
+
 import type { Shipment } from '@/types/shipment';
 
 // Generic paged result type (used by customers, shipments, etc.)
@@ -27,6 +33,32 @@ export interface PagedResult<T> {
   page: number;
   limit: number;
 }
+
+export type ContainerStatus =
+  | 'Order Placed'
+  | 'Order Confirmed'
+  | 'In Transit'
+  | 'Out for Delivery'
+  | 'Delivered'
+  | 'Arrived at Warehouse'
+  | 'Departed from Warehouse'
+  | 'Delivery Delayed';
+
+
+// Container summary type (for /shipments/containers)
+export type ContainerSummary = {
+  containerNo: string;
+  shipmentTypes: (string | null | undefined)[];
+  shipmentCount: number;
+  totalNetCharges: number;
+  lastDate?: string;
+  status?: ContainerStatus;
+  currentLocation?: string;
+  expectedDeliveryDate?: string;
+  statusUpdatedAt?: string;
+  trackingRemarks?: string;
+  lastCreatedAt?: string;
+};
 
 // AUTH
 export const authApi = {
@@ -66,10 +98,7 @@ export const employeeApi = {
   },
 
   update: async (id: string, input: UpdateEmployeeInput) => {
-    const { data } = await axios.patch<Employee>(
-      `/employees/${id}`,
-      input,
-    );
+    const { data } = await axios.patch<Employee>(`/employees/${id}`, input);
     return data;
   },
 
@@ -231,11 +260,45 @@ export const shipmentApi = {
     customerId?: string;
     fromDate?: string;
     toDate?: string;
+    // ✅ NEW: optional container filter (used by listByContainer)
+    containerNo?: string;
   }): Promise<PagedResult<Shipment>> => {
     const { data } = await axios.get<PagedResult<Shipment>>(
       '/shipments',
       { params },
     );
+    return data;
+  },
+
+  // ✅ NEW: container wise list (aggregated)
+  listContainers: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    fromDate?: string;
+    toDate?: string;
+  }): Promise<PagedResult<ContainerSummary>> => {
+    const { data } = await axios.get<PagedResult<ContainerSummary>>(
+      '/shipments/containers',
+      { params },
+    );
+    return data;
+  },
+
+  // ✅ NEW: shipments inside a container (reuses /shipments with containerNo query param)
+  listByContainer: async (
+    containerNo: string,
+    params: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      fromDate?: string;
+      toDate?: string;
+    },
+  ): Promise<PagedResult<Shipment>> => {
+    const { data } = await axios.get<PagedResult<Shipment>>('/shipments', {
+      params: { ...params, containerNo },
+    });
     return data;
   },
 
@@ -256,5 +319,133 @@ export const shipmentApi = {
   // NEW: delete shipment
   remove: async (id: string): Promise<void> => {
     await axios.delete(`/shipments/${id}`);
+  },
+
+    updateContainerStatus: async (
+    containerNo: string,
+    payload: {
+      status: ContainerStatus;
+      currentLocation?: string;
+      expectedDeliveryDate?: string;
+      remarks?: string;
+    },
+  ): Promise<{
+    id: string;
+    containerNo: string;
+    status: ContainerStatus;
+    currentLocation?: string;
+    expectedDeliveryDate?: string;
+    remarks?: string;
+    updatedAt?: string;
+  }> => {
+    const { data } = await axios.patch(
+      `/shipments/containers/${encodeURIComponent(containerNo)}/status`,
+      payload,
+    );
+    return data;
+  },
+
+
+};
+
+// =======================
+// PAYMENTS / RECEIVABLES
+// =======================
+
+export type PaymentStatus = 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
+
+export interface Payment {
+  id: string;
+  date: string;
+  amount: number;
+  method: string;
+  reference?: string;
+  note?: string;
+  collectedByEmployeeId?: string;
+  collectedByEmployeeName?: string;
+  createdAt: string;
+}
+
+export interface PaymentAccount {
+  id: string;
+  shipmentId: string;
+  shipmentMongoId: string;
+  customerId: string;
+  customerName: string;
+  userId: string;
+  mobileNumber?: string;
+  invoiceAmount: number;
+  totalPaid: number;
+  balance: number;
+  status: PaymentStatus;
+  invoiceDate?: string;
+  dueDate?: string;
+  lastPaymentDate?: string;
+  ageDays?: number | null;
+  payments: Payment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentSummary {
+  unpaid: number;
+  partiallyPaid: number;
+  paid: number;
+  overdue: number;
+  totalReceivable: number;
+}
+
+export const paymentApi = {
+  getSummary: async (): Promise<PaymentSummary> => {
+    const { data } = await axios.get<PaymentSummary>('/payments/summary');
+    return data;
+  },
+
+  queryAccounts: async (params?: {
+    status?: PaymentStatus | '';
+    customerId?: string;
+    shipmentId?: string;
+    dueDateFrom?: string;
+    dueDateTo?: string;
+    search?: string;
+  }): Promise<PaymentAccount[]> => {
+    const { data } = await axios.get<PaymentAccount[]>('/payments/accounts', {
+      params,
+    });
+    return data;
+  },
+
+  getAccount: async (shipmentId: string): Promise<PaymentAccount> => {
+    const { data } = await axios.get<PaymentAccount>(
+      `/payments/accounts/${shipmentId}`,
+    );
+    return data;
+  },
+
+  recordPayment: async (
+    shipmentId: string,
+    input: {
+      amount: number;
+      date?: string;
+      method: string;
+      reference?: string;
+      note?: string;
+    },
+  ): Promise<PaymentAccount> => {
+    const { data } = await axios.post<PaymentAccount>(
+      `/payments/accounts/${shipmentId}/payments`,
+      input,
+    );
+    return data;
+  },
+
+  deletePayment: async (
+    shipmentId: string,
+    paymentId: string,
+  ): Promise<PaymentAccount> => {
+    const { data } = await axios.delete<PaymentAccount>(
+      `/payments/accounts/${shipmentId}/payments/${paymentId}`,
+    );
+    return data;
   },
 };
