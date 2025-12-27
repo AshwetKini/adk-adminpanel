@@ -71,9 +71,32 @@ function clampMoney(n: number) {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+function getCustomerLabel(c: any) {
+  const id: string | undefined = c?._id || c?.id;
+  return (
+    c?.fullName ||
+    c?.companyName ||
+    c?.customerId ||
+    c?.mobileNumber ||
+    id ||
+    'Customer'
+  );
+}
+
 export default function LedgerPage() {
+  // Customers (searchable)
   const [customers, setCustomers] = useState<any[]>([]);
   const [customerId, setCustomerId] = useState<string>('');
+  const [customerMap, setCustomerMap] = useState<Record<string, string>>({});
+
+  const [customerDropdownOpen, setCustomerDropdownOpen] = useState(false);
+  const [customerText, setCustomerText] = useState(''); // input text in combobox
+  const [customerSearch, setCustomerSearch] = useState(''); // server search query
+  const [customerPage, setCustomerPage] = useState(1);
+  const [customerTotal, setCustomerTotal] = useState(0);
+  const [customerLoading, setCustomerLoading] = useState(false);
+  const customerWrapRef = useRef<HTMLDivElement | null>(null);
+  const customerDebounceRef = useRef<any>(null);
 
   // View mode
   const [view, setView] = useState<ViewMode>('outstanding');
@@ -85,7 +108,7 @@ export default function LedgerPage() {
   const [useDueDateFilter, setUseDueDateFilter] = useState<boolean>(false);
 
   const [shipmentId, setShipmentId] = useState<string>('');
-  const [q, setQ] = useState<string>('');
+  const [q, setQ] = useState<string>(''); // ledger search
   const [status, setStatus] = useState<PaymentStatusFilter>('all');
 
   // Data
@@ -118,26 +141,65 @@ export default function LedgerPage() {
   const [paySaving, setPaySaving] = useState(false);
   const [payError, setPayError] = useState<string>('');
 
-  // used to debounce server reload when typing
+  // used to debounce server reload when typing (ledger filters)
   const debounceRef = useRef<any>(null);
 
-  const customerOptions = useMemo(() => {
-    return customers
-      .map((c) => {
-        const id: string | undefined = c?._id || c?.id;
-        const label = c?.fullName || c?.companyName || c?.customerId || c?.mobileNumber || id || 'Customer';
-        return id ? { id, label } : null;
-      })
-      .filter(Boolean) as Array<{ id: string; label: string }>;
-  }, [customers]);
+  const selectedCustomerLabel = useMemo(() => {
+    if (!customerId) return '';
+    const fromMap = customerMap[customerId];
+    if (fromMap) return fromMap;
 
+    const found = customers.find((c) => (c?._id || c?.id) === customerId);
+    return found ? getCustomerLabel(found) : customerId;
+  }, [customerId, customerMap, customers]);
+
+  // keep combobox text showing selected customer when closed
+  useEffect(() => {
+    if (!customerDropdownOpen) setCustomerText(selectedCustomerLabel || '');
+  }, [selectedCustomerLabel, customerDropdownOpen]);
+
+  const fetchCustomers = useCallback(
+    async (page: number, searchText: string, append: boolean) => {
+      setCustomerLoading(true);
+      try {
+        const res = await customerApi.all({
+          page,
+          limit: 50,
+          search: searchText?.trim() ? searchText.trim() : undefined,
+        });
+
+        const list = res?.data || [];
+        const total = Number(res?.total ?? list.length);
+
+        setCustomerTotal(total);
+        setCustomerPage(page);
+
+        setCustomers((prev) => (append ? [...prev, ...list] : list));
+
+        // update cache map (id -> label)
+        setCustomerMap((prev) => {
+          const next = { ...prev };
+          for (const c of list) {
+            const id = String(c?._id || c?.id || '');
+            if (id) next[id] = getCustomerLabel(c);
+          }
+          return next;
+        });
+
+        return list;
+      } finally {
+        setCustomerLoading(false);
+      }
+    },
+    [],
+  );
+
+  // Initial customers load
   useEffect(() => {
     (async () => {
       setErrorMsg('');
       try {
-        const res = await customerApi.all({ page: 1, limit: 50 });
-        const list = res?.data || [];
-        setCustomers(list);
+        const list = await fetchCustomers(1, '', false);
 
         const firstId = (list?.[0]?._id || list?.[0]?.id) as string | undefined;
         if (firstId) setCustomerId(firstId);
@@ -145,7 +207,33 @@ export default function LedgerPage() {
         setErrorMsg(e?.response?.data?.message || e?.message || 'Failed to load customers');
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Close customer dropdown on outside click
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const el = customerWrapRef.current;
+      if (!el) return;
+      if (!el.contains(e.target as Node)) setCustomerDropdownOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, []);
+
+  // Debounced customer search
+  useEffect(() => {
+    if (!customerDropdownOpen) return;
+
+    if (customerDebounceRef.current) clearTimeout(customerDebounceRef.current);
+    customerDebounceRef.current = setTimeout(() => {
+      fetchCustomers(1, customerSearch, false).catch(() => {});
+    }, 350);
+
+    return () => {
+      if (customerDebounceRef.current) clearTimeout(customerDebounceRef.current);
+    };
+  }, [customerSearch, customerDropdownOpen, fetchCustomers]);
 
   const loadOutstanding = useCallback(async () => {
     if (!customerId) return;
@@ -262,7 +350,6 @@ export default function LedgerPage() {
         const full = await paymentApi.getAccount(sid);
         setSelectedAccount(full);
 
-        // Fetch shipment details using mongo id present in PaymentAccount
         if (full?.shipmentMongoId) {
           setShipmentLoading(true);
           try {
@@ -348,7 +435,6 @@ export default function LedgerPage() {
       setSelectedAccount(updated);
       setPayOpen(false);
 
-      // update list row without full reload
       setAccounts((prev) => {
         const next = Array.isArray(prev) ? [...prev] : [];
         const idx = next.findIndex((a) => a?.shipmentId === sid);
@@ -458,6 +544,8 @@ export default function LedgerPage() {
     return { totalNet, totalCtns, totalKgs, totalCbm, count: items.length };
   }, [shipment]);
 
+  const canLoadMoreCustomers = customers.length < customerTotal;
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-5">
@@ -466,7 +554,7 @@ export default function LedgerPage() {
           <div>
             <div className="text-sm text-slate-500">Finance</div>
             <h1 className="text-xl font-semibold text-slate-900">Ledger / Accounts Receivable</h1>
-            <div className="mt-1 text-sm text-slate-500">Click a row to view invoice, shipment items and payments.</div>
+            <div className="mt-1 text-sm text-slate-500">Search customer quickly, then manage AR with invoice-level details.</div>
           </div>
 
           <div className="flex gap-2">
@@ -493,19 +581,117 @@ export default function LedgerPage() {
         {/* Filters */}
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
-            <div className="md:col-span-4">
-              <div className="mb-1 text-xs font-medium text-slate-600">Customer</div>
-              <select
-                className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                value={customerId}
-                onChange={(e) => setCustomerId(e.target.value)}
-              >
-                {customerOptions.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
+            {/* Customer searchable combobox */}
+            <div className="md:col-span-4" ref={customerWrapRef}>
+              <div className="mb-1 flex items-center justify-between">
+                <div className="text-xs font-medium text-slate-600">Customer</div>
+                <div className="text-[11px] text-slate-400">
+                  {customerLoading ? 'Searching…' : customerTotal ? `${customers.length}/${customerTotal}` : ''}
+                </div>
+              </div>
+
+              <div className="relative">
+                <input
+                  className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 pr-9 text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  placeholder={selectedCustomerLabel ? `Selected: ${selectedCustomerLabel}` : 'Type to search customer…'}
+                  value={customerText}
+                  onFocus={() => {
+                    setCustomerDropdownOpen(true);
+                    setCustomerText('');
+                    setCustomerSearch('');
+                    fetchCustomers(1, '', false).catch(() => {});
+                  }}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setCustomerText(v);
+                    setCustomerSearch(v);
+                    setCustomerDropdownOpen(true);
+                  }}
+                />
+
+                {/* Clear button */}
+                <button
+                  type="button"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  title="Clear"
+                  onClick={() => {
+                    setCustomerText('');
+                    setCustomerSearch('');
+                    setCustomerDropdownOpen(true);
+                    fetchCustomers(1, '', false).catch(() => {});
+                  }}
+                >
+                  ✕
+                </button>
+
+                {customerDropdownOpen ? (
+                  <div className="absolute z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg">
+                    <div className="max-h-72 overflow-auto">
+                      {customerLoading && customers.length === 0 ? (
+                        <div className="p-3 text-sm text-slate-600">Loading customers…</div>
+                      ) : customers.length === 0 ? (
+                        <div className="p-3 text-sm text-slate-600">No customers found.</div>
+                      ) : (
+                        <ul className="divide-y divide-slate-100">
+                          {customers.map((c) => {
+                            const id = String(c?._id || c?.id || '');
+                            const label = getCustomerLabel(c);
+                            const active = id && id === customerId;
+
+                            return (
+                              <li key={id || label}>
+                                <button
+                                  type="button"
+                                  className={cx(
+                                    'w-full px-3 py-2 text-left text-sm hover:bg-slate-50',
+                                    active && 'bg-blue-50',
+                                  )}
+                                  onClick={() => {
+                                    if (!id) return;
+                                    setCustomerId(id);
+                                    setCustomerDropdownOpen(false);
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="font-medium text-slate-900 truncate">{label}</div>
+                                    {active ? (
+                                      <span className="text-xs font-medium text-blue-700">Selected</span>
+                                    ) : null}
+                                  </div>
+                                  <div className="mt-0.5 text-xs text-slate-500 truncate">
+                                    {c?.mobileNumber ? `Mobile: ${c.mobileNumber}` : ''}
+                                    {c?.customerId ? `${c?.mobileNumber ? ' • ' : ''}ID: ${c.customerId}` : ''}
+                                  </div>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between gap-2 border-t border-slate-200 p-2">
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100"
+                        onClick={() => setCustomerDropdownOpen(false)}
+                      >
+                        Close
+                      </button>
+
+                      <button
+                        type="button"
+                        className="rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 hover:bg-slate-100 disabled:opacity-50"
+                        disabled={!canLoadMoreCustomers || customerLoading}
+                        onClick={() => fetchCustomers(customerPage + 1, customerSearch, true).catch(() => {})}
+                        title={canLoadMoreCustomers ? 'Load more customers' : 'All loaded'}
+                      >
+                        {customerLoading ? 'Loading…' : canLoadMoreCustomers ? 'Load more' : 'All loaded'}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -524,7 +710,7 @@ export default function LedgerPage() {
               <div className="mb-1 text-xs font-medium text-slate-600">Search</div>
               <input
                 className="h-10 w-full rounded-md border border-slate-200 bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-blue-200"
-                placeholder="Shipment / customer / amount…"
+                placeholder="Shipment / amount / status…"
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -830,9 +1016,7 @@ export default function LedgerPage() {
                       ) : shipmentLoading ? (
                         <div className="mt-3 text-sm text-slate-600">Loading shipment…</div>
                       ) : !shipment ? (
-                        <div className="mt-3 text-sm text-slate-500">
-                          Shipment record not available for this receivable (missing shipmentMongoId).
-                        </div>
+                        <div className="mt-3 text-sm text-slate-500">Shipment record not available for this receivable (missing shipmentMongoId).</div>
                       ) : (
                         <>
                           <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
@@ -889,7 +1073,6 @@ export default function LedgerPage() {
                                       </tr>
                                     ))}
                                   </tbody>
-
                                   <tfoot>
                                     <tr className="border-t border-slate-200 bg-slate-50">
                                       <td className="px-3 py-2 text-xs font-medium text-slate-600">Totals</td>
@@ -898,9 +1081,7 @@ export default function LedgerPage() {
                                       <td className="px-3 py-2 text-xs font-medium text-slate-600">—</td>
                                       <td className="px-3 py-2 text-xs font-medium text-slate-600">{shipmentItemTotals.totalKgs || '-'}</td>
                                       <td className="px-3 py-2 text-xs font-medium text-slate-600">{shipmentItemTotals.totalCbm || '-'}</td>
-                                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-900">
-                                        {formatINR(shipmentItemTotals.totalNet)}
-                                      </td>
+                                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-900">{formatINR(shipmentItemTotals.totalNet)}</td>
                                     </tr>
                                   </tfoot>
                                 </table>
