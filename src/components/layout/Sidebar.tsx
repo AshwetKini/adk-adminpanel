@@ -46,6 +46,7 @@ const employeeMenu: MenuItem[] = [
   { title: 'Customers', href: '/employee/customers' },
   { title: 'Shipments', href: '/employee/shipments' },
   { title: 'Payments', href: '/payments' },
+  { title: 'Chats', href: '/employee/chats' },
   { title: 'Ledger', href: '/ledger' },
 ];
 

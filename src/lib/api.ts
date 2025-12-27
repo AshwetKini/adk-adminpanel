@@ -494,3 +494,120 @@ export const ledgerApi = {
   },
 };
 
+// =======================
+// CHAT + BROADCAST
+// =======================
+
+export type ChatUserType = 'employee' | 'customer' | 'admin';
+
+export type ChatUserRef = {
+  userType: ChatUserType;
+  userId: string;
+  displayName?: string;
+};
+
+export type ChatGroup = {
+  _id: string;
+  tenantKey?: string;
+  name?: string;
+  createdBy?: ChatUserRef;
+  members?: ChatUserRef[];
+  unreadCount?: number;
+  updatedAt?: string;
+  createdAt?: string;
+};
+
+export type ChatMessage = {
+  _id: string;
+  tenantKey?: string;
+  groupId: string;
+  sender?: ChatUserRef;
+  text?: string;
+  clientMessageId?: string;
+  deletedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const chatApi = {
+  myGroups: async (): Promise<ChatGroup[]> => {
+    const { data } = await axios.get('/chat/groups');
+    return Array.isArray(data) ? data : [];
+  },
+
+  createGroup: async (payload: { name: string; members?: ChatUserRef[] }): Promise<ChatGroup> => {
+    const { data } = await axios.post('/chat/groups', payload);
+    return data as ChatGroup;
+  },
+
+  // Used by Chat Info screen (no GET /chat/groups/:id in backend, so list + find)
+  getGroupById: async (groupId: string): Promise<ChatGroup | null> => {
+    const list = await chatApi.myGroups();
+    return list.find((g) => String(g._id) === String(groupId)) ?? null;
+  },
+
+  // PATCH /chat/groups/:groupId/members
+  addMembers: async (groupId: string, members: ChatUserRef[]): Promise<ChatGroup> => {
+    const { data } = await axios.patch(`/chat/groups/${groupId}/members`, { members });
+    return data as ChatGroup;
+  },
+
+  listMessages: async (
+    groupId: string,
+    params?: { limit?: number; before?: string; markRead?: boolean },
+  ): Promise<ChatMessage[]> => {
+    const { data } = await axios.get(`/chat/groups/${groupId}/messages`, { params });
+    return Array.isArray(data) ? data : [];
+  },
+};
+
+export type BroadcastRecipient = {
+  userType: 'customer' | 'employee' | 'admin';
+  userId: string;
+  displayName?: string;
+};
+
+export type BroadcastList = {
+  _id: string;
+  name: string;
+  recipients?: BroadcastRecipient[];
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export const broadcastApi = {
+  create: async (payload: { name: string; recipients: BroadcastRecipient[] }): Promise<BroadcastList> => {
+    const { data } = await axios.post('/chat/broadcast-lists', payload);
+    return data as BroadcastList;
+  },
+
+  list: async (): Promise<BroadcastList[]> => {
+    const { data } = await axios.get('/chat/broadcast-lists');
+    return Array.isArray(data) ? data : [];
+  },
+
+  get: async (id: string): Promise<BroadcastList> => {
+    const { data } = await axios.get(`/chat/broadcast-lists/${id}`);
+    return data as BroadcastList;
+  },
+
+  rename: async (id: string, name: string): Promise<BroadcastList> => {
+    const { data } = await axios.patch(`/chat/broadcast-lists/${id}`, { name });
+    return data as BroadcastList;
+  },
+
+  setRecipients: async (id: string, recipients: BroadcastRecipient[]): Promise<BroadcastList> => {
+    const { data } = await axios.patch(`/chat/broadcast-lists/${id}/recipients`, { recipients });
+    return data as BroadcastList;
+  },
+
+  remove: async (id: string): Promise<{ ok: boolean }> => {
+    const { data } = await axios.delete(`/chat/broadcast-lists/${id}`);
+    return data as { ok: boolean };
+  },
+
+  send: async (id: string, payload: { text: string; clientRequestId?: string }) => {
+    const { data } = await axios.post(`/chat/broadcast-lists/${id}/send`, payload);
+    return data as { ok: boolean; sent: number; results: any[] };
+  },
+};
