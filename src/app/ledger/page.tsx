@@ -1,10 +1,10 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { customerApi, paymentApi, ledgerApi } from '@/lib/api';
+import { customerApi, paymentApi, ledgerApi, shipmentApi } from '@/lib/api';
 
 type ViewMode = 'outstanding' | 'statement';
-type PaymentStatusFilter = 'all' | 'unpaid' | 'partiallypaid' | 'paid' | 'overdue';
+type PaymentStatusFilter = 'all' | 'unpaid' | 'partially_paid' | 'paid' | 'overdue';
 
 function formatINR(value?: number | null) {
   const v = typeof value === 'number' ? value : 0;
@@ -27,10 +27,12 @@ function cx(...classes: Array<string | false | null | undefined>) {
 }
 
 function statusPill(status?: string) {
-  const s = String(status || '').toLowerCase();
+  const raw = String(status || '').toLowerCase();
+  const s = raw === 'partiallypaid' ? 'partially_paid' : raw; // backward-safe
+
   const isOverdue = s === 'overdue';
   const isPaid = s === 'paid';
-  const isPartial = s === 'partiallypaid';
+  const isPartial = s === 'partially_paid';
   const isUnpaid = s === 'unpaid';
 
   const cls = isOverdue
@@ -100,6 +102,11 @@ export default function LedgerPage() {
   const [selectedAccount, setSelectedAccount] = useState<any | null>(null);
   const [drawerLoading, setDrawerLoading] = useState(false);
   const [drawerError, setDrawerError] = useState('');
+
+  // Drawer: Shipment details + line items
+  const [shipment, setShipment] = useState<any | null>(null);
+  const [shipmentLoading, setShipmentLoading] = useState(false);
+  const [shipmentError, setShipmentError] = useState('');
 
   // Record payment modal
   const [payOpen, setPayOpen] = useState(false);
@@ -238,7 +245,7 @@ export default function LedgerPage() {
     };
   }, [accounts]);
 
-  // Drawer: load latest account on open
+  // Drawer: load latest account + shipment (line items)
   useEffect(() => {
     const sid = selectedShipmentId;
     if (!drawerOpen || !sid) return;
@@ -246,9 +253,28 @@ export default function LedgerPage() {
     (async () => {
       setDrawerLoading(true);
       setDrawerError('');
+
+      setShipment(null);
+      setShipmentError('');
+      setShipmentLoading(false);
+
       try {
         const full = await paymentApi.getAccount(sid);
         setSelectedAccount(full);
+
+        // Fetch shipment details using mongo id present in PaymentAccount
+        if (full?.shipmentMongoId) {
+          setShipmentLoading(true);
+          try {
+            const sh = await shipmentApi.get(String(full.shipmentMongoId));
+            setShipment(sh);
+          } catch (e: any) {
+            setShipment(null);
+            setShipmentError(e?.response?.data?.message || e?.message || 'Failed to load shipment details');
+          } finally {
+            setShipmentLoading(false);
+          }
+        }
       } catch (e: any) {
         setSelectedAccount(null);
         setDrawerError(e?.response?.data?.message || e?.message || 'Failed to load account details');
@@ -262,6 +288,11 @@ export default function LedgerPage() {
     setSelectedShipmentId(shipmentId);
     setSelectedAccount(null);
     setDrawerError('');
+
+    setShipment(null);
+    setShipmentError('');
+    setShipmentLoading(false);
+
     setDrawerOpen(true);
   };
 
@@ -270,6 +301,10 @@ export default function LedgerPage() {
     setSelectedShipmentId(null);
     setSelectedAccount(null);
     setDrawerError('');
+
+    setShipment(null);
+    setShipmentError('');
+    setShipmentLoading(false);
   };
 
   const openPayModal = () => {
@@ -413,6 +448,16 @@ export default function LedgerPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Shipment line-items totals (ERP-like)
+  const shipmentItemTotals = useMemo(() => {
+    const items: any[] = Array.isArray(shipment?.lineItems) ? shipment.lineItems : [];
+    const totalNet = items.reduce((s, li) => s + safeNum(li?.totalNetCharges), 0);
+    const totalCtns = items.reduce((s, li) => s + safeNum(li?.ctns), 0);
+    const totalKgs = items.reduce((s, li) => s + safeNum(li?.kgs), 0);
+    const totalCbm = items.reduce((s, li) => s + safeNum(li?.cbm), 0);
+    return { totalNet, totalCtns, totalKgs, totalCbm, count: items.length };
+  }, [shipment]);
+
   return (
     <div className="min-h-[calc(100vh-64px)] bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-5">
@@ -421,7 +466,7 @@ export default function LedgerPage() {
           <div>
             <div className="text-sm text-slate-500">Finance</div>
             <h1 className="text-xl font-semibold text-slate-900">Ledger / Accounts Receivable</h1>
-            <div className="mt-1 text-sm text-slate-500">Click a row to view payments and record receipts.</div>
+            <div className="mt-1 text-sm text-slate-500">Click a row to view invoice, shipment items and payments.</div>
           </div>
 
           <div className="flex gap-2">
@@ -494,7 +539,7 @@ export default function LedgerPage() {
               >
                 <option value="all">All</option>
                 <option value="unpaid">Unpaid</option>
-                <option value="partiallypaid">Partially paid</option>
+                <option value="partially_paid">Partially paid</option>
                 <option value="overdue">Overdue</option>
                 <option value="paid">Paid</option>
               </select>
@@ -668,8 +713,7 @@ export default function LedgerPage() {
                 </thead>
                 <tbody>
                   {statementRows.map((r, idx) => {
-                    const employee =
-                      r?.collectedByEmployeeName || r?.createdByEmployeeName || r?.employeeName || r?.createdBy || '-';
+                    const employee = r?.collectedByEmployeeName || r?.createdByEmployeeName || r?.employeeName || r?.createdBy || '-';
 
                     return (
                       <tr key={r.id || r._id || `${idx}`} className="border-b border-slate-100 hover:bg-slate-50">
@@ -701,19 +745,16 @@ export default function LedgerPage() {
               <div className="flex items-center justify-between border-b border-slate-200 p-4">
                 <div>
                   <div className="text-xs text-slate-500">Receivable</div>
-                  <div className="text-base font-semibold text-slate-900">{selectedShipmentId || '-'}</div>
+                  <div className="text-base font-semibold text-slate-900">{selectedShipmentId || selectedAccount?.shipmentId || '-'}</div>
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100"
-                    onClick={closeDrawer}
-                  >
+                  <button className="rounded-md border border-slate-200 px-3 py-2 text-sm hover:bg-slate-100" onClick={closeDrawer}>
                     Close
                   </button>
                 </div>
               </div>
 
-              <div className="p-4">
+              <div className="p-4 overflow-auto h-[calc(100vh-64px)]">
                 {drawerLoading ? (
                   <div className="text-sm text-slate-600">Loading details…</div>
                 ) : drawerError ? (
@@ -773,6 +814,103 @@ export default function LedgerPage() {
                           <div className="mt-1 text-slate-900">{formatDate(selectedAccount?.lastPaymentDate)}</div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Shipment + line items (ERP invoice style) */}
+                    <div className="rounded-lg border border-slate-200 p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-semibold text-slate-900">Shipment details</div>
+                        <div className="text-xs text-slate-500">
+                          {shipmentLoading ? 'Loading…' : shipmentError ? 'Error' : shipment ? `Shipment: ${shipment?.shipmentId || '-'}` : 'Not linked'}
+                        </div>
+                      </div>
+
+                      {shipmentError ? (
+                        <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{shipmentError}</div>
+                      ) : shipmentLoading ? (
+                        <div className="mt-3 text-sm text-slate-600">Loading shipment…</div>
+                      ) : !shipment ? (
+                        <div className="mt-3 text-sm text-slate-500">
+                          Shipment record not available for this receivable (missing shipmentMongoId).
+                        </div>
+                      ) : (
+                        <>
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <div className="text-xs text-slate-500">Receipt date</div>
+                              <div className="mt-1 text-slate-900">{formatDate(shipment?.receiptDate || shipment?.date)}</div>
+                            </div>
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <div className="text-xs text-slate-500">Delivery location</div>
+                              <div className="mt-1 text-slate-900">{shipment?.deliveryLocation || '-'}</div>
+                            </div>
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <div className="text-xs text-slate-500">Container</div>
+                              <div className="mt-1 text-slate-900">{shipment?.containerNo || '-'}</div>
+                            </div>
+                            <div className="rounded-md bg-slate-50 p-3">
+                              <div className="text-xs text-slate-500">Type</div>
+                              <div className="mt-1 text-slate-900">{shipment?.shipmentType || '-'}</div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm font-semibold text-slate-900">Line items</div>
+                              <div className="text-xs text-slate-500">{shipmentItemTotals.count} item(s)</div>
+                            </div>
+
+                            {Array.isArray(shipment?.lineItems) && shipment.lineItems.length > 0 ? (
+                              <div className="mt-3 overflow-auto">
+                                <table className="min-w-[980px] w-full text-sm">
+                                  <thead className="bg-slate-50">
+                                    <tr className="border-b border-slate-200 text-left text-xs font-medium text-slate-600">
+                                      <th className="px-3 py-2">SO</th>
+                                      <th className="px-3 py-2">Ctns</th>
+                                      <th className="px-3 py-2">Item</th>
+                                      <th className="px-3 py-2">PCS</th>
+                                      <th className="px-3 py-2">KGS</th>
+                                      <th className="px-3 py-2">CBM</th>
+                                      <th className="px-3 py-2 text-right">Net charges</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {shipment.lineItems.map((li: any, idx: number) => (
+                                      <tr key={li?._id || `${idx}`} className="border-b border-slate-100">
+                                        <td className="px-3 py-2 text-slate-700">{li?.soNo || '-'}</td>
+                                        <td className="px-3 py-2 text-slate-700">{li?.ctns ?? '-'}</td>
+                                        <td className="px-3 py-2 text-slate-900 font-medium">{li?.itemName || '-'}</td>
+                                        <td className="px-3 py-2 text-slate-700">{li?.pcsRaw ?? li?.pcs ?? '-'}</td>
+                                        <td className="px-3 py-2 text-slate-700">{li?.kgs ?? '-'}</td>
+                                        <td className="px-3 py-2 text-slate-700">{li?.cbm ?? '-'}</td>
+                                        <td className="px-3 py-2 text-right text-slate-900 font-medium">
+                                          {li?.totalNetCharges != null ? formatINR(Number(li.totalNetCharges)) : '-'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+
+                                  <tfoot>
+                                    <tr className="border-t border-slate-200 bg-slate-50">
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">Totals</td>
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">{shipmentItemTotals.totalCtns || '-'}</td>
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">—</td>
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">—</td>
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">{shipmentItemTotals.totalKgs || '-'}</td>
+                                      <td className="px-3 py-2 text-xs font-medium text-slate-600">{shipmentItemTotals.totalCbm || '-'}</td>
+                                      <td className="px-3 py-2 text-right text-xs font-semibold text-slate-900">
+                                        {formatINR(shipmentItemTotals.totalNet)}
+                                      </td>
+                                    </tr>
+                                  </tfoot>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="mt-2 text-sm text-slate-500">No line items found for this shipment.</div>
+                            )}
+                          </div>
+                        </>
+                      )}
                     </div>
 
                     {/* Payments table */}
@@ -863,9 +1001,7 @@ export default function LedgerPage() {
                       onChange={(e) => setPayAmount(e.target.value)}
                       inputMode="decimal"
                     />
-                    <div className="mt-1 text-xs text-slate-500">
-                      Balance: {formatINR(safeNum(selectedAccount?.balance))}
-                    </div>
+                    <div className="mt-1 text-xs text-slate-500">Balance: {formatINR(safeNum(selectedAccount?.balance))}</div>
                   </div>
 
                   <div>
