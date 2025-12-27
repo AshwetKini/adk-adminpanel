@@ -25,7 +25,12 @@ import type {
 } from '@/types/customer';
 
 import type { Shipment } from '@/types/shipment';
-
+import type {
+  CustomerStatementResponse,
+  OutstandingResponse,
+  AgeingResponse,
+  CreateVoucherInput,
+} from '../types/ledger';
 // Generic paged result type (used by customers, shipments, etc.)
 export interface PagedResult<T> {
   data: T[];
@@ -449,3 +454,43 @@ export const paymentApi = {
     return data;
   },
 };
+
+// LEDGER (AR Sub-ledger)
+export const ledgerApi = {
+  customerStatement: async (
+    customerId: string,
+    params?: { from?: string; to?: string; shipmentId?: string },
+  ) => {
+    const { data } = await axios.get(`/ledger/customers/${customerId}/statement`, { params });
+    return data;
+  },
+
+  customerOutstanding: async (
+    customerId: string,
+    params?: { asOf?: string; shipmentId?: string },
+  ) => {
+    const { data } = await axios.get(`/ledger/customers/${customerId}/outstanding`, { params });
+    return data;
+  },
+
+  customerAgeing: async (customerId: string, params?: { asOf?: string }) => {
+    const { data } = await axios.get(`/ledger/customers/${customerId}/ageing`, { params });
+    return data;
+  },
+
+  createVoucher: async (input: {
+    customerId: string;
+    shipmentMongoId?: string;
+    shipmentId?: string;
+    type: 'opening_balance' | 'adjustment';
+    direction: 'debit' | 'credit';
+    amount: number;
+    date: string;
+    narration?: string;
+    reference?: string;
+  }) => {
+    const { data } = await axios.post(`/ledger/vouchers`, input);
+    return data;
+  },
+};
+

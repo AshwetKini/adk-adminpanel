@@ -46,6 +46,7 @@ const employeeMenu: MenuItem[] = [
   { title: 'Customers', href: '/employee/customers' },
   { title: 'Shipments', href: '/employee/shipments' },
   { title: 'Payments', href: '/payments' },
+  { title: 'Ledger', href: '/ledger' },
 ];
 
 type SidebarProps = {
@@ -121,8 +122,7 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
       {/* Navigation */}
       <nav className="mt-2 flex-1 space-y-1 overflow-y-auto px-2 text-sm">
         {menu.map((item) => {
-          const active =
-            pathname === item.href || pathname.startsWith(item.href + '/');
+          const active = pathname === item.href || pathname.startsWith(item.href + '/');
 
           return (
             <Link
@@ -155,12 +155,8 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
         <div className="flex items-center justify-between gap-2">
           {!collapsed && (
             <div className="min-w-0">
-              <div className="truncate font-semibold">
-                {userName || 'Logged in'}
-              </div>
-              <div className="truncate text-[10px] capitalize text-slate-400">
-                {role || 'user'}
-              </div>
+              <div className="truncate font-semibold">{userName || 'Logged in'}</div>
+              <div className="truncate text-[10px] capitalize text-slate-400">{role || 'user'}</div>
             </div>
           )}
           <button
