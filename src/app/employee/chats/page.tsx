@@ -29,7 +29,6 @@ function parseJwt(token: string | null): any | null {
 }
 
 function extractUserId(payload: any): string {
-  // Mirrors backend extractUserId priority (sub/userId/id/_id/employeeId/customerId). [file:87]
   const id =
     payload?.sub ??
     payload?.userId ??
@@ -41,7 +40,6 @@ function extractUserId(payload: any): string {
 }
 
 function extractUserType(payload: any): 'employee' | 'admin' | 'customer' {
-  // Mirrors backend extractUserType() role parsing. [file:87]
   const raw = String(payload?.role ?? payload?.userType ?? payload?.type ?? '').toLowerCase();
   if (raw.includes('customer')) return 'customer';
   if (raw.includes('admin') || raw.includes('tenant') || raw.includes('superadmin')) return 'admin';
@@ -66,6 +64,15 @@ function formatTime(iso?: string) {
     : d.toLocaleDateString([], { day: '2-digit', month: 'short' });
 }
 
+function initials(name: string) {
+  const s = String(name ?? '').trim();
+  if (!s) return '?';
+  const parts = s.split(/\s+/).filter(Boolean).slice(0, 2);
+  const a = parts[0]?.[0] ?? '?';
+  const b = parts.length > 1 ? parts[1]?.[0] ?? '' : '';
+  return (a + b).toUpperCase();
+}
+
 export default function EmployeeChatsPage() {
   const token = typeof window === 'undefined' ? null : localStorage.getItem('access_token');
   const me = useMemo(() => {
@@ -77,6 +84,9 @@ export default function EmployeeChatsPage() {
   const [lastByGroupId, setLastByGroupId] = useState<Record<string, ChatMessage | null>>({});
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // NEW: unread filter toggle
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   // Realtime inbox updates (for chat list page)
   useEffect(() => {
@@ -112,6 +122,16 @@ export default function EmployeeChatsPage() {
         } as ChatGroup;
 
         next.unshift(bumped);
+
+        // 3) NEW: increment unreadCount for this group (only if message is not from me)
+        const senderUserId = String((msg as any)?.sender?.userId ?? (msg as any)?.fromUserId ?? '');
+        const senderUserType = String((msg as any)?.sender?.userType ?? (msg as any)?.fromUserType ?? '');
+        const isFromMe = senderUserId === String(me.userId) && senderUserType === String(me.userType);
+
+        if (!isFromMe) {
+          (next[0] as any).unreadCount = Number((next[0] as any).unreadCount ?? 0) + 1;
+        }
+
         return next;
       });
     };
@@ -131,11 +151,10 @@ export default function EmployeeChatsPage() {
         return { ...prev, [gid]: updatedMsg };
       });
 
-      // Optional: bump updatedAt so the right-side time can update if your server changes it
+      // Keep ordering stable; just bump updatedAt if present
       setGroups((prev) => {
         const idx = prev.findIndex((g) => String((g as any)?._id ?? (g as any)?.id) === gid);
         if (idx < 0) return prev;
-
         const next = [...prev];
         const g = next[idx] as any;
         next[idx] = { ...g, updatedAt: (updatedMsg as any)?.updatedAt ?? g?.updatedAt };
@@ -174,7 +193,7 @@ export default function EmployeeChatsPage() {
       const list = await chatApi.myGroups();
       setGroups(list);
 
-      // Preview: fetch last message without marking read (same as mobile). [file:130]
+      // Preview: fetch last message without marking read
       const slice = list.slice(0, 30);
       const results = await Promise.all(
         slice.map(async (g) => {
@@ -201,84 +220,233 @@ export default function EmployeeChatsPage() {
     load();
   }, []);
 
+  const unreadChatsCount = useMemo(() => {
+    return groups.filter((g) => Number((g as any).unreadCount ?? 0) > 0).length;
+  }, [groups]);
+
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase();
-    if (!t) return groups;
-    return groups.filter((g) => {
+
+    let list = groups;
+
+    // NEW: unread-only filter
+    if (showUnreadOnly) {
+      list = list.filter((g) => Number((g as any).unreadCount ?? 0) > 0);
+    }
+
+    // existing: search filter
+    if (!t) return list;
+
+    return list.filter((g) => {
       const title = getGroupTitle(g).toLowerCase();
       const last = lastByGroupId[String((g as any)._id)];
       const prev = safePreview(last).toLowerCase();
       return title.includes(t) || prev.includes(t);
     });
-  }, [groups, q, lastByGroupId]);
+  }, [groups, q, lastByGroupId, showUnreadOnly]);
 
   return (
-    <div className="p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Chats</h1>
-        <div className="flex gap-2">
-          <Link href="/employee/chats/new">
-            <Button size="sm">+ New chat</Button>
-          </Link>
-          <Link href="/employee/broadcasts">
-            <Button size="sm" variant="secondary">
-              Broadcast
-            </Button>
-          </Link>
-        </div>
-      </div>
+    <div className="min-h-[calc(100vh-120px)] bg-[#f0f2f5]">
+      <div className="mx-auto w-full max-w-6xl px-2 py-3">
+        <div className="h-[calc(100vh-160px)] min-h-[560px] w-full overflow-hidden rounded-xl border bg-white shadow-sm flex">
+          {/* Left: chat list (WhatsApp-like) */}
+          <div className="w-full lg:w-[420px] border-r flex flex-col">
+            {/* Top bar */}
+            <div className="flex items-center justify-between px-4 py-3 bg-[#f0f2f5] border-b">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="h-10 w-10 rounded-full bg-[#dfe5e7] flex items-center justify-center text-sm font-semibold text-[#111b21]">
+                  {initials(me?.userType ? `${me.userType}` : 'Me')}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="text-[15px] font-semibold text-[#111b21] truncate">Chats</div>
 
-      <div className="mt-3 flex gap-2">
-        <input
-          className="border rounded px-3 py-2 w-full"
-          placeholder="Search chats…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
-        <Button variant="secondary" onClick={() => setQ('')}>
-          Clear
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="mt-4 text-sm text-gray-600">Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div className="mt-4 text-sm text-gray-600">No chats found.</div>
-      ) : (
-        <div className="mt-4 divide-y border rounded">
-          {filtered.map((g) => {
-            const gid = String((g as any)._id);
-            const title = getGroupTitle(g);
-            const last = lastByGroupId[gid];
-            const unread = (g as any).unreadCount ?? 0;
-            const time = formatTime((last as any)?.createdAt || (g as any).updatedAt);
-
-            return (
-              <Link
-                key={gid}
-                href={`/employee/chats/${gid}?title=${encodeURIComponent(title)}`}
-                className="block"
-              >
-                <div className="p-3 hover:bg-gray-50 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="font-medium truncate">{title}</div>
-                    <div className="text-sm text-gray-600 truncate">{safePreview(last)}</div>
-                  </div>
-
-                  <div className="flex flex-col items-end w-24 shrink-0">
-                    <div className="text-xs text-gray-500">{time}</div>
-                    {unread > 0 ? (
-                      <div className="mt-1 text-xs bg-green-600 text-white rounded-full px-2 py-0.5">
-                        {unread > 99 ? '99+' : String(unread)}
-                      </div>
+                    {/* NEW: unread pill (WhatsApp-ish) */}
+                    {unreadChatsCount > 0 ? (
+                      <button
+                        type="button"
+                        className="shrink-0 text-[11px] font-semibold px-2 py-0.5 rounded-full bg-[#00a884] text-white"
+                        onClick={() => setShowUnreadOnly((v) => !v)}
+                        title="Toggle unread filter"
+                      >
+                        Unread {unreadChatsCount}
+                      </button>
                     ) : null}
                   </div>
+
+                  <div className="text-[12px] text-[#667781] truncate">
+                    {loading ? 'Loading…' : `${filtered.length} conversations`}
+                    {showUnreadOnly ? ' (unread only)' : ''}
+                  </div>
                 </div>
-              </Link>
-            );
-          })}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <Link href="/employee/chats/new">
+                  <Button size="sm">+ New</Button>
+                </Link>
+                <Link href="/employee/broadcasts">
+                  <Button size="sm" variant="secondary">
+                    Broadcast
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Search + filter row */}
+            <div className="px-3 py-3 bg-white border-b space-y-2">
+              <div className="flex items-center gap-2 rounded-full bg-[#f0f2f5] px-3 py-2">
+                <span className="text-[#667781] text-sm">🔎</span>
+                <input
+                  className="w-full bg-transparent outline-none text-sm text-[#111b21] placeholder:text-[#667781]"
+                  placeholder="Search or start new chat"
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                {q.trim() ? (
+                  <button
+                    type="button"
+                    className="text-[#667781] text-lg leading-none px-1"
+                    onClick={() => setQ('')}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                ) : null}
+              </div>
+
+              {/* NEW: simple All / Unread toggle (doesn't change UI layout) */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUnreadOnly(false)}
+                  className={[
+                    'text-[12px] font-semibold px-3 py-1 rounded-full border',
+                    !showUnreadOnly ? 'bg-[#111b21] text-white border-[#111b21]' : 'bg-white text-[#111b21]',
+                  ].join(' ')}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowUnreadOnly(true)}
+                  className={[
+                    'text-[12px] font-semibold px-3 py-1 rounded-full border',
+                    showUnreadOnly ? 'bg-[#00a884] text-white border-[#00a884]' : 'bg-white text-[#111b21]',
+                  ].join(' ')}
+                  disabled={unreadChatsCount === 0}
+                  title={unreadChatsCount === 0 ? 'No unread chats' : 'Show unread chats only'}
+                >
+                  Unread
+                </button>
+              </div>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto bg-white">
+              {loading ? (
+                <div className="px-4 py-6 text-sm text-[#667781]">Loading…</div>
+              ) : filtered.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-[#667781]">No chats found.</div>
+              ) : (
+                <div>
+                  {filtered.map((g) => {
+                    const gid = String((g as any)._id);
+                    const title = getGroupTitle(g);
+                    const last = lastByGroupId[gid];
+                    const unread = Number((g as any).unreadCount ?? 0);
+                    const time = formatTime((last as any)?.createdAt || (g as any).updatedAt);
+
+                    return (
+                      <Link
+                        key={gid}
+                        href={`/employee/chats/${gid}?title=${encodeURIComponent(title)}`}
+                        className="block"
+                      >
+                        <div className="px-3">
+                          <div
+                            className={[
+                              'flex items-center gap-3 px-2 py-3 rounded-lg',
+                              'hover:bg-[#f5f6f6] transition-colors',
+                              unread > 0 ? 'bg-[#f3fffb]' : '',
+                            ].join(' ')}
+                          >
+                            {/* Avatar */}
+                            <div className="h-12 w-12 rounded-full bg-[#dfe5e7] flex items-center justify-center text-[13px] font-semibold text-[#111b21] shrink-0">
+                              {initials(title)}
+                            </div>
+
+                            {/* Middle */}
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <div
+                                  className={[
+                                    'text-[15px] truncate',
+                                    unread > 0 ? 'font-semibold text-[#111b21]' : 'font-medium text-[#111b21]',
+                                  ].join(' ')}
+                                >
+                                  {title}
+                                </div>
+                                <div
+                                  className={[
+                                    'text-[11px] shrink-0',
+                                    unread > 0 ? 'text-[#00a884] font-semibold' : 'text-[#667781]',
+                                  ].join(' ')}
+                                >
+                                  {time}
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-2 mt-0.5">
+                                <div
+                                  className={[
+                                    'text-[13px] truncate',
+                                    unread > 0 ? 'text-[#3b4a54]' : 'text-[#667781]',
+                                  ].join(' ')}
+                                >
+                                  {safePreview(last)}
+                                </div>
+
+                                {unread > 0 ? (
+                                  <div className="shrink-0 min-w-5 h-5 px-1.5 rounded-full bg-[#00a884] text-white text-[11px] font-semibold flex items-center justify-center">
+                                    {unread > 99 ? '99+' : String(unread)}
+                                  </div>
+                                ) : (
+                                  <div className="w-5" />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="border-b ml-[72px]" />
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: placeholder panel */}
+          <div className="hidden lg:flex flex-1 bg-[#efeae2] relative">
+            <div
+              className="absolute inset-0 opacity-[0.06]"
+              style={{
+                backgroundImage: "radial-gradient(circle at 1px 1px, #111b21 1px, transparent 0)",
+                backgroundSize: '18px 18px',
+              }}
+            />
+            <div className="relative m-auto max-w-md text-center px-8">
+              <div className="text-xl font-semibold text-[#111b21]">ADK Chats</div>
+              <div className="mt-2 text-sm text-[#667781]">
+                Select a chat to start messaging
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+
+      </div>
     </div>
   );
 }
