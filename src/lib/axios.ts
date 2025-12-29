@@ -1,6 +1,7 @@
 // src/lib/axios.ts
 import axios from 'axios';
 import { getLocalAccess, getLocalRefresh, setLocalTokens, clearLocalTokens } from './tokens';
+import { syncChatSocketAuth } from './chatSocket';
 
 const apiBase = process.env.NEXT_PUBLIC_API_URL;
 const tenantKey = process.env.NEXT_PUBLIC_TENANT_KEY;
@@ -20,7 +21,6 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
-
 // Auto refresh on 401
 let isRefreshing = false;
 let queue: Array<(t: string) => void> = [];
@@ -34,6 +34,7 @@ axiosInstance.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
+
     if (error.response?.status === 401 && !original._retry) {
       original._retry = true;
 
@@ -49,7 +50,9 @@ axiosInstance.interceptors.response.use(
 
       try {
         isRefreshing = true;
+
         const refreshLocal = getLocalRefresh();
+
         // Call backend refresh (cookie also present via withCredentials)
         const { data } = await axios.post(
           `${apiBase}/auth/refresh`,
@@ -59,8 +62,20 @@ axiosInstance.interceptors.response.use(
             withCredentials: true,
           },
         );
-        const newAccess = data.access_token;
+
+        // Be tolerant to different backend key names
+        const newAccess =
+          data?.access_token ?? data?.accesstoken ?? data?.accessToken ?? data?.token ?? '';
+
+        if (!newAccess) {
+          throw new Error('Refresh did not return access token');
+        }
+
         setLocalTokens(newAccess, refreshLocal || '');
+
+        // ✅ NEW: re-auth socket with latest token (prevents chat auth mismatch after refresh)
+        syncChatSocketAuth();
+
         onRefreshed(newAccess);
         original.headers.Authorization = `Bearer ${newAccess}`;
         return axiosInstance(original);
@@ -74,6 +89,7 @@ axiosInstance.interceptors.response.use(
         isRefreshing = false;
       }
     }
+
     return Promise.reject(error);
   },
 );
