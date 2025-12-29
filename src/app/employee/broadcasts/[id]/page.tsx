@@ -146,6 +146,9 @@ export default function EmployeeBroadcastDetailPage() {
   const [customerIdMap, setCustomerIdMap] = useState<Record<string, string>>({});
   const [customerIdLoading, setCustomerIdLoading] = useState(false);
 
+  // NEW: Map: recipient.userId (mongo id) -> customer.fullName (display name)
+  const [customerNameMap, setCustomerNameMap] = useState<Record<string, string>>({});
+
   // Animations: re-trigger row entrance on paging/search
   const [rowsAnimKey, setRowsAnimKey] = useState(0);
 
@@ -179,6 +182,31 @@ export default function EmployeeBroadcastDetailPage() {
     return { name, createdAt, updatedAt };
   }, [list]);
 
+  function getRecipientLabel(r: BroadcastRecipient) {
+    const typeLower = String((r as any)?.userType ?? '').toLowerCase();
+    const uid = String((r as any)?.userId ?? '').trim();
+
+    const rawDisplayName = String((r as any)?.displayName ?? '').trim();
+    const rawLower = rawDisplayName.toLowerCase();
+
+    // Treat generic displayName like "Customer" as not-a-real name,
+    // so we can show resolved customerName instead.
+    const generic =
+      rawLower === 'customer' || rawLower === 'employee' || rawLower === 'admin' || rawLower === 'user';
+
+    if (rawDisplayName && !generic) return rawDisplayName;
+
+    if (typeLower === 'customer') {
+      const resolvedName = String(customerNameMap[uid] ?? '').trim();
+      if (resolvedName) return resolvedName;
+
+      const resolvedCustomerId = String(customerIdMap[uid] ?? '').trim();
+      if (resolvedCustomerId) return resolvedCustomerId;
+    }
+
+    return prettyRecipientLabel(r);
+  }
+
   const filteredRecipients = useMemo(() => {
     const t = recipientQuery.trim().toLowerCase();
     if (!t) return recipients;
@@ -186,11 +214,14 @@ export default function EmployeeBroadcastDetailPage() {
     return recipients.filter((r) => {
       const type = String((r as any)?.userType ?? '').toLowerCase();
       const uid = String((r as any)?.userId ?? '');
+
       const customerId = type === 'customer' ? (customerIdMap[uid] ?? '') : '';
-      const s = [r?.displayName, r?.userType, r?.userId, customerId].filter(Boolean).join(' ');
+      const customerName = type === 'customer' ? (customerNameMap[uid] ?? '') : '';
+
+      const s = [r?.displayName, customerName, r?.userType, r?.userId, customerId].filter(Boolean).join(' ');
       return String(s).toLowerCase().includes(t);
     });
-  }, [recipients, recipientQuery, customerIdMap]);
+  }, [recipients, recipientQuery, customerIdMap, customerNameMap]);
 
   // Reset pagination when search changes or list changes
   useEffect(() => {
@@ -253,7 +284,7 @@ export default function EmployeeBroadcastDetailPage() {
     return Object.prototype.hasOwnProperty.call(customerIdMap, uid);
   }
 
-  // Resolve customerId ONLY for visible page (fast even if list has 10k recipients)
+  // Resolve customerId + customerName ONLY for visible page (fast even if list has 10k recipients)
   useEffect(() => {
     const ids = Array.from(
       new Set(
@@ -264,7 +295,12 @@ export default function EmployeeBroadcastDetailPage() {
       ),
     );
 
-    const missing = ids.filter((uid) => !Object.prototype.hasOwnProperty.call(customerIdMap, uid));
+    const missing = ids.filter(
+      (uid) =>
+        !Object.prototype.hasOwnProperty.call(customerIdMap, uid) ||
+        !Object.prototype.hasOwnProperty.call(customerNameMap, uid),
+    );
+
     if (missing.length === 0) return;
 
     let cancelled = false;
@@ -273,7 +309,9 @@ export default function EmployeeBroadcastDetailPage() {
       setCustomerIdLoading(true);
 
       const queue = [...missing];
-      const found: Record<string, string> = {};
+      const foundIds: Record<string, string> = {};
+      const foundNames: Record<string, string> = {};
+
       const concurrency = Math.min(6, queue.length);
 
       async function worker() {
@@ -283,10 +321,15 @@ export default function EmployeeBroadcastDetailPage() {
 
           try {
             const customer = await customerApi.one(uid);
+
             const cid = String((customer as any)?.customerId ?? '').trim();
-            found[uid] = cid || '';
+            const name = String((customer as any)?.fullName ?? (customer as any)?.name ?? '').trim();
+
+            foundIds[uid] = cid || '';
+            foundNames[uid] = name || '';
           } catch {
-            found[uid] = '';
+            foundIds[uid] = '';
+            foundNames[uid] = '';
           }
         }
       }
@@ -294,7 +337,8 @@ export default function EmployeeBroadcastDetailPage() {
       await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 
       if (!cancelled) {
-        setCustomerIdMap((prev) => ({ ...prev, ...found }));
+        setCustomerIdMap((prev) => ({ ...prev, ...foundIds }));
+        setCustomerNameMap((prev) => ({ ...prev, ...foundNames }));
         setCustomerIdLoading(false);
       }
     }
@@ -304,8 +348,8 @@ export default function EmployeeBroadcastDetailPage() {
     return () => {
       cancelled = true;
     };
-    // NOTE: customerIdMap intentionally included so we don't re-fetch cached keys
-  }, [visibleRecipients, customerIdMap]);
+    // NOTE: include maps so we don't re-fetch cached keys
+  }, [visibleRecipients, customerIdMap, customerNameMap]);
 
   const selectedIds = useMemo(() => {
     return new Set(selectedCustomers.map((c) => String(c?.id ?? c?._id ?? '')));
@@ -445,20 +489,24 @@ export default function EmployeeBroadcastDetailPage() {
   function openEditRecipients() {
     if (!list) return;
 
-    const existingCustomerIds = new Set(
-      (list.recipients || [])
-        .filter((r) => String((r as any)?.userType ?? '').toLowerCase() === 'customer')
-        .map((r) => String((r as any).userId)),
-    );
+    const existingCustomers = (list.recipients || []).filter(
+      (r) => String((r as any)?.userType ?? '').toLowerCase() === 'customer',
+    ) as BroadcastRecipient[];
 
     setSelectedCustomers(
-      Array.from(existingCustomerIds).map((cid) => ({
-        id: cid,
-        _id: cid,
-        fullName: '',
-        customerId: '',
-        mobileNumber: '',
-      })),
+      existingCustomers.map((r) => {
+        const uid = String((r as any)?.userId ?? '').trim();
+        const label = getRecipientLabel(r); // already resolves customerNameMap if available
+        const cid = String(customerIdMap[uid] ?? '').trim();
+
+        return {
+          id: uid,
+          _id: uid,
+          fullName: label && label.toLowerCase() !== 'customer' ? label : '',
+          customerId: cid,
+          mobileNumber: '',
+        };
+      }),
     );
 
     setEditOpen(true);
@@ -499,15 +547,21 @@ export default function EmployeeBroadcastDetailPage() {
     }
 
     const nextRecipients: BroadcastRecipient[] = selectedCustomers.map((c: any) => {
-      const fullName = String(c.fullName ?? '').trim();
-      const customerId = String(c.customerId ?? '').trim();
+      const uid = String(c.id ?? c._id).trim();
+
+      // Fill from cached maps if modal has placeholder items
+      const fullName =
+        String(c.fullName ?? '').trim() || String(customerNameMap[uid] ?? '').trim();
+
+      const customerId =
+        String(c.customerId ?? '').trim() || String(customerIdMap[uid] ?? '').trim();
 
       const displayName =
         fullName && customerId ? `${fullName} (${customerId})` : fullName || customerId || 'Customer';
 
       return {
         userType: 'customer',
-        userId: String(c.id ?? c._id),
+        userId: uid,
         displayName,
       };
     });
@@ -647,11 +701,7 @@ export default function EmployeeBroadcastDetailPage() {
             </div>
 
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => setMessageText('')}
-                disabled={sending || deleting || !messageText.trim()}
-              >
+              <Button variant="secondary" onClick={() => setMessageText('')} disabled={sending || deleting || !messageText.trim()}>
                 Clear
               </Button>
               <Button onClick={onSend} disabled={!canSend || loading || !listId}>
@@ -744,11 +794,7 @@ export default function EmployeeBroadcastDetailPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Button
-                    variant="secondary"
-                    onClick={() => setRecipientQuery('')}
-                    disabled={!recipientQuery.trim().length}
-                  >
+                  <Button variant="secondary" onClick={() => setRecipientQuery('')} disabled={!recipientQuery.trim().length}>
                     Clear
                   </Button>
 
@@ -785,11 +831,7 @@ export default function EmployeeBroadcastDetailPage() {
                   <option value={200}>200</option>
                 </select>
 
-                <Button
-                  variant="secondary"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
+                <Button variant="secondary" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
                   Prev
                 </Button>
 
@@ -838,7 +880,7 @@ export default function EmployeeBroadcastDetailPage() {
                   </tr>
                 ) : (
                   visibleRecipients.map((r, idx) => {
-                    const label = String((r as any)?.displayName ?? '').trim() || prettyRecipientLabel(r);
+                    const label = getRecipientLabel(r);
                     const type = String((r as any)?.userType ?? '—');
                     const shownId = getDisplayedId(r);
 
@@ -851,10 +893,7 @@ export default function EmployeeBroadcastDetailPage() {
                       <tr
                         key={`${typeLower}:${String((r as any)?.userId ?? '')}:${rowIndex}`}
                         style={{ animationDelay: `${Math.min(idx * 18, 240)}ms` }}
-                        className={[
-                          'recipient-row row-enter',
-                          idx % 2 === 1 ? 'bg-slate-50/20' : 'bg-white',
-                        ].join(' ')}
+                        className={['recipient-row row-enter', idx % 2 === 1 ? 'bg-slate-50/20' : 'bg-white'].join(' ')}
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
@@ -922,8 +961,7 @@ export default function EmployeeBroadcastDetailPage() {
             <div className="min-w-0">
               <div className="text-sm font-semibold text-slate-900">Edit recipients</div>
               <div className="mt-1 text-xs text-slate-500">
-                Customer-only picker. Selected:{' '}
-                <span className="font-semibold text-slate-900">{selectedCustomers.length}</span>
+                Customer-only picker. Selected: <span className="font-semibold text-slate-900">{selectedCustomers.length}</span>
               </div>
             </div>
 
