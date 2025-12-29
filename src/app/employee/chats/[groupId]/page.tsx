@@ -201,68 +201,66 @@ export default function EmployeeChatRoomPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [groupId]);
 
-  // socket listeners + join
-  useEffect(() => {
-    if (!groupId) return;
+// socket listeners + join
+useEffect(() => {
+  if (!groupId) return;
 
+  const join = () => {
     socket.emit('group:join', { groupId }, (ack: any) => {
-      if (!ack?.ok) {
-        // group not found or forbidden, just go back
-        router.back();
-      }
+      if (!ack?.ok) router.back();
     });
+  };
 
-    const onNewMessage = (payload: { groupId: string; message: ChatMessage }) => {
-      if (payload?.groupId !== groupId) return;
+  if (socket.connected) join();
+  else socket.once('connect', join);
 
-      const incoming = payload.message;
-      upsertMessage(incoming);
+  const onNewMessage = (payload: { groupId: string; message: ChatMessage }) => {
+    if (payload?.groupId !== groupId) return;
+    const incoming = payload.message;
+    upsertMessage(incoming);
+    if (incoming?.clientMessageId && isMine(incoming)) {
+      setStatusByClientId((m) => ({ ...m, [String(incoming.clientMessageId)]: 'delivered' }));
+    }
+  };
 
-      if (incoming?.clientMessageId && isMine(incoming)) {
-        setStatusByClientId((m) => ({ ...m, [String(incoming.clientMessageId)]: 'delivered' }));
-      }
-    };
+  const onTyping = (payload: { groupId: string; user?: any; isTyping?: boolean }) => {
+    if (payload?.groupId !== groupId) return;
+    const u = payload?.user;
+    const isTyping = !!payload?.isTyping;
 
-    const onTyping = (payload: { groupId: string; user?: any; isTyping?: boolean }) => {
-      if (payload?.groupId !== groupId) return;
+    if (u?.userId && String(u.userId) === me.userId && String(u.userType) === me.userType) return;
 
-      const u = payload?.user;
-      const isTyping = !!payload?.isTyping;
+    if (!isTyping) {
+      setTypingLabel(null);
+      return;
+    }
 
-      // ignore self
-      if (u?.userId && String(u.userId) === me.userId && String(u.userType) === me.userType) return;
+    const name = String(u?.displayName ?? '').trim() || prettyUserType(u?.userType);
+    setTypingLabel(`${name} is typing…`);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+    typingTimerRef.current = setTimeout(() => setTypingLabel(null), 1800);
+  };
 
-      if (!isTyping) {
-        setTypingLabel(null);
-        return;
-      }
+  const onMessageDeleted = (payload: { groupId: string; messageId: string; message: ChatMessage }) => {
+    if (payload?.groupId !== groupId) return;
+    const mid = String(payload.messageId || '');
+    const msg = payload.message;
+    setMessages((prev) => prev.map((m) => (String(m._id) === mid ? msg : m)));
+  };
 
-      const name = String(u?.displayName ?? '').trim() || prettyUserType(u?.userType);
-      setTypingLabel(`${name} is typing…`);
+  socket.on('group:newMessage', onNewMessage);
+  socket.on('group:typing', onTyping);
+  socket.on('group:messageDeleted', onMessageDeleted);
 
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-      typingTimerRef.current = setTimeout(() => setTypingLabel(null), 1800);
-    };
+  return () => {
+    socket.off('group:newMessage', onNewMessage);
+    socket.off('group:typing', onTyping);
+    socket.off('group:messageDeleted', onMessageDeleted);
+    socket.off('connect', join);
+    if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+  };
+}, [socket, groupId, me.userId, me.userType, router]);
 
-    const onMessageDeleted = (payload: { groupId: string; messageId: string; message: ChatMessage }) => {
-      if (payload?.groupId !== groupId) return;
-      const mid = String(payload.messageId || '');
-      const msg = payload.message;
-
-      setMessages((prev) => prev.map((m) => (String(m._id) === mid ? msg : m)));
-    };
-
-    socket.on('group:newMessage', onNewMessage);
-    socket.on('group:typing', onTyping);
-    socket.on('group:messageDeleted', onMessageDeleted);
-
-    return () => {
-      socket.off('group:newMessage', onNewMessage);
-      socket.off('group:typing', onTyping);
-      socket.off('group:messageDeleted', onMessageDeleted);
-      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
-    };
-  }, [socket, groupId, me.userId, me.userType, router]);
 
   // auto-scroll only if user is already near bottom
   useEffect(() => {

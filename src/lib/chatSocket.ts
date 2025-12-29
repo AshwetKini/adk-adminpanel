@@ -2,7 +2,7 @@
 import { io, type Socket } from 'socket.io-client';
 import { getLocalAccess } from './tokens';
 
-const apiUrl = process.env.NEXT_PUBLIC_API_URL; // usually http://host:3000/api (used by axios)
+const apiUrl = process.env.NEXT_PUBLIC_API_URL; 
 const tenantKey = process.env.NEXT_PUBLIC_TENANT_KEY;
 
 let socketRef: Socket | null = null;
@@ -11,8 +11,6 @@ let lastToken: string | null = null;
 function socketBaseUrl() {
   if (!apiUrl) throw new Error('NEXT_PUBLIC_API_URL is missing');
 
-  // Important: socket namespace is served at server root: http://host:3000/chat
-  // but axios baseURL is typically http://host:3000/api. [file:166][file:120]
   return apiUrl.endsWith('/api') ? apiUrl.slice(0, -4) : apiUrl;
 }
 
@@ -30,7 +28,7 @@ export function getChatSocket(): Socket {
       transports: ['websocket'],
       autoConnect: false,
 
-      // Your backend gateway supports auth.token + auth.tenantKey for web clients. [file:77]
+      // Backend supports auth.token + auth.tenantKey for web clients
       auth: { token, tenantKey },
     });
 
