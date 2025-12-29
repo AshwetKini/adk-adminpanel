@@ -2,8 +2,14 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
+
 import { chatApi, type ChatGroup, type ChatMessage } from '@/lib/api';
+import { getChatSocket } from '@/lib/chatSocket';
+
 import { Button } from '@/components/ui/Button';
+
+type InboxNewMessagePayload = { groupId: string; message: ChatMessage };
+type InboxMessageDeletedPayload = { groupId: string; messageId: string; message: ChatMessage };
 
 function parseJwt(token: string | null): any | null {
   if (!token) return null;
@@ -24,7 +30,13 @@ function parseJwt(token: string | null): any | null {
 
 function extractUserId(payload: any): string {
   // Mirrors backend extractUserId priority (sub/userId/id/_id/employeeId/customerId). [file:87]
-  const id = payload?.sub ?? payload?.userId ?? payload?.id ?? payload?._id ?? payload?.employeeId ?? payload?.customerId;
+  const id =
+    payload?.sub ??
+    payload?.userId ??
+    payload?.id ??
+    payload?._id ??
+    payload?.employeeId ??
+    payload?.customerId;
   return id ? String(id) : '';
 }
 
@@ -38,8 +50,8 @@ function extractUserType(payload: any): 'employee' | 'admin' | 'customer' {
 
 function safePreview(msg?: ChatMessage | null) {
   if (!msg) return 'Tap to open chat';
-  if (msg.deletedAt) return 'This message was deleted';
-  const t = String(msg.text ?? '').trim();
+  if ((msg as any).deletedAt) return 'This message was deleted';
+  const t = String((msg as any).text ?? '').trim();
   return t ? t : 'Tap to open chat';
 }
 
@@ -66,13 +78,89 @@ export default function EmployeeChatsPage() {
   const [q, setQ] = useState('');
   const [loading, setLoading] = useState(true);
 
+  // Realtime inbox updates (for chat list page)
+  useEffect(() => {
+    if (!me?.userId || !me?.userType) return;
+
+    let socket: any;
+    try {
+      socket = getChatSocket();
+    } catch {
+      // If token/env missing, keep HTTP-only behavior
+      return;
+    }
+
+    const onInboxNewMessage = (payload: InboxNewMessagePayload | any) => {
+      const gid = String(payload?.groupId ?? payload?.message?.groupId ?? '');
+      const msg = payload?.message as ChatMessage | undefined;
+      if (!gid || !msg) return;
+
+      // 1) Update preview cache (last message)
+      setLastByGroupId((prev) => ({ ...prev, [gid]: msg }));
+
+      // 2) Move the group to top (WhatsApp-like) and bump updatedAt so time updates immediately
+      setGroups((prev) => {
+        const idx = prev.findIndex((g) => String((g as any)?._id ?? (g as any)?.id) === gid);
+        if (idx < 0) return prev;
+
+        const next = [...prev];
+        const [found] = next.splice(idx, 1);
+
+        const bumped = {
+          ...(found as any),
+          updatedAt: (msg as any)?.createdAt ?? (found as any)?.updatedAt,
+        } as ChatGroup;
+
+        next.unshift(bumped);
+        return next;
+      });
+    };
+
+    const onInboxMessageDeleted = (payload: InboxMessageDeletedPayload | any) => {
+      const gid = String(payload?.groupId ?? '');
+      const deletedId = String(payload?.messageId ?? '');
+      const updatedMsg = payload?.message as ChatMessage | undefined;
+
+      if (!gid || !deletedId || !updatedMsg) return;
+
+      // Only update the preview if the deleted message is currently shown as "last" in the list
+      setLastByGroupId((prev) => {
+        const current = prev[gid];
+        const currentId = String((current as any)?._id ?? (current as any)?.id ?? '');
+        if (!currentId || currentId !== deletedId) return prev;
+        return { ...prev, [gid]: updatedMsg };
+      });
+
+      // Optional: bump updatedAt so the right-side time can update if your server changes it
+      setGroups((prev) => {
+        const idx = prev.findIndex((g) => String((g as any)?._id ?? (g as any)?.id) === gid);
+        if (idx < 0) return prev;
+
+        const next = [...prev];
+        const g = next[idx] as any;
+        next[idx] = { ...g, updatedAt: (updatedMsg as any)?.updatedAt ?? g?.updatedAt };
+        return next;
+      });
+    };
+
+    socket.on('inbox:newMessage', onInboxNewMessage);
+    socket.on('inbox:messageDeleted', onInboxMessageDeleted);
+
+    return () => {
+      socket.off('inbox:newMessage', onInboxNewMessage);
+      socket.off('inbox:messageDeleted', onInboxMessageDeleted);
+    };
+  }, [me?.userId, me?.userType]);
+
   function getGroupTitle(g: ChatGroup) {
-    const explicit = String(g?.name ?? '').trim();
+    const explicit = String((g as any)?.name ?? '').trim();
     if (explicit) return explicit;
 
-    const members = Array.isArray(g?.members) ? g.members : [];
+    const members = Array.isArray((g as any)?.members) ? (g as any).members : [];
     if (members.length === 2) {
-      const other = members.find((m) => String(m.userId) !== me.userId || String(m.userType) !== me.userType);
+      const other = members.find(
+        (m: any) => String(m.userId) !== me.userId || String(m.userType) !== me.userType,
+      );
       const otherName = String(other?.displayName ?? '').trim();
       if (otherName) return otherName;
       if (other?.userType && other?.userId) return `${other.userType}:${other.userId}`;
@@ -91,10 +179,10 @@ export default function EmployeeChatsPage() {
       const results = await Promise.all(
         slice.map(async (g) => {
           try {
-            const arr = await chatApi.listMessages(String(g._id), { limit: 1, markRead: false });
-            return [String(g._id), arr[0] ?? null] as const;
+            const arr = await chatApi.listMessages(String((g as any)._id), { limit: 1, markRead: false });
+            return [String((g as any)._id), arr[0] ?? null] as const;
           } catch {
-            return [String(g._id), null] as const;
+            return [String((g as any)._id), null] as const;
           }
         }),
       );
@@ -118,7 +206,7 @@ export default function EmployeeChatsPage() {
     if (!t) return groups;
     return groups.filter((g) => {
       const title = getGroupTitle(g).toLowerCase();
-      const last = lastByGroupId[String(g._id)];
+      const last = lastByGroupId[String((g as any)._id)];
       const prev = safePreview(last).toLowerCase();
       return title.includes(t) || prev.includes(t);
     });
@@ -133,7 +221,9 @@ export default function EmployeeChatsPage() {
             <Button size="sm">+ New chat</Button>
           </Link>
           <Link href="/employee/broadcasts">
-            <Button size="sm" variant="secondary">Broadcast</Button>
+            <Button size="sm" variant="secondary">
+              Broadcast
+            </Button>
           </Link>
         </div>
       </div>
@@ -145,7 +235,9 @@ export default function EmployeeChatsPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <Button variant="secondary" onClick={() => setQ('')}>Clear</Button>
+        <Button variant="secondary" onClick={() => setQ('')}>
+          Clear
+        </Button>
       </div>
 
       {loading ? (
@@ -155,14 +247,18 @@ export default function EmployeeChatsPage() {
       ) : (
         <div className="mt-4 divide-y border rounded">
           {filtered.map((g) => {
-            const gid = String(g._id);
+            const gid = String((g as any)._id);
             const title = getGroupTitle(g);
             const last = lastByGroupId[gid];
-            const unread = g.unreadCount ?? 0;
-            const time = formatTime(last?.createdAt || g.updatedAt);
+            const unread = (g as any).unreadCount ?? 0;
+            const time = formatTime((last as any)?.createdAt || (g as any).updatedAt);
 
             return (
-              <Link key={gid} href={`/employee/chats/${gid}?title=${encodeURIComponent(title)}`} className="block">
+              <Link
+                key={gid}
+                href={`/employee/chats/${gid}?title=${encodeURIComponent(title)}`}
+                className="block"
+              >
                 <div className="p-3 hover:bg-gray-50 flex items-center justify-between gap-4">
                   <div className="min-w-0">
                     <div className="font-medium truncate">{title}</div>
