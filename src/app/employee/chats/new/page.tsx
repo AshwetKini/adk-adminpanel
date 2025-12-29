@@ -2,10 +2,17 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { Inter } from 'next/font/google';
 import { chatApi, type ChatUserRef } from '@/lib/api';
 import { customerApi } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+
+const inter = Inter({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700', '800', '900'],
+  display: 'swap',
+});
 
 type Mode = 'dm' | 'group';
 type Step = 'pick' | 'subject';
@@ -95,8 +102,8 @@ export default function NewChatPage() {
   }, []);
 
   const selectedIds = useMemo(() => new Set(selected.map((x) => safeId(x))), [selected]);
-  const title = mode === 'dm' ? 'New chat' : step === 'pick' ? 'New group' : 'Group subject';
 
+  const title = mode === 'dm' ? 'New chat' : step === 'pick' ? 'New group' : 'Group subject';
   const subtitle =
     mode === 'dm'
       ? `${items.length} contacts`
@@ -131,7 +138,7 @@ export default function NewChatPage() {
   }, [query]);
 
   useEffect(() => {
-    // reset on mode change (same behavior)
+    // keep existing behavior: reset on mode change
     setStep('pick');
     setQuery('');
     setSelected([]);
@@ -232,7 +239,7 @@ export default function NewChatPage() {
   const dmSelected = mode === 'dm' ? selected[0] : null;
 
   return (
-    <div className="nc-page">
+    <div className={`${inter.className} nc-page`}>
       {/* Toast */}
       {toast ? (
         <div className={['nc-toast', `nc-toast-${toast.type}`].join(' ')} role="status" aria-live="polite">
@@ -257,12 +264,14 @@ export default function NewChatPage() {
           </div>
 
           <div className="nc-actions">
-            <div className="nc-seg">
+            <div className="nc-seg" role="tablist" aria-label="Chat mode">
               <button
                 type="button"
                 className={['nc-segBtn', mode === 'dm' ? 'active' : ''].join(' ')}
                 onClick={() => setMode('dm')}
                 disabled={creating}
+                role="tab"
+                aria-selected={mode === 'dm'}
               >
                 Message
               </button>
@@ -271,6 +280,8 @@ export default function NewChatPage() {
                 className={['nc-segBtn', mode === 'group' ? 'active' : ''].join(' ')}
                 onClick={() => setMode('group')}
                 disabled={creating}
+                role="tab"
+                aria-selected={mode === 'group'}
               >
                 Group
               </button>
@@ -283,13 +294,13 @@ export default function NewChatPage() {
         </div>
 
         <div className="nc-body">
-          {/* Left: picker */}
+          {/* Left */}
           <div className="nc-left">
             {mode === 'group' && step === 'subject' ? (
               <div className="nc-card">
                 <div className="nc-cardHeader">
                   <div className="nc-cardTitle">Group subject</div>
-                  <div className="nc-cardSub">Name your group and confirm participants.</div>
+                  <div className="nc-cardSub">Give your group a clear name and review participants.</div>
                 </div>
 
                 <div className="nc-cardContent">
@@ -345,11 +356,13 @@ export default function NewChatPage() {
                 <div className="nc-cardHeader">
                   <div className="nc-cardTitle">{mode === 'dm' ? 'Select a customer' : 'Add participants'}</div>
                   <div className="nc-cardSub">
-                    {mode === 'dm' ? 'Pick one customer to start a chat.' : 'Pick at least 2 customers for a group.'}
+                    {mode === 'dm'
+                      ? 'Pick one customer to start a chat.'
+                      : 'Pick at least 2 customers, then continue.'}
                   </div>
                 </div>
 
-                {/* Selected chips (group only) */}
+                {/* Group chips */}
                 {mode === 'group' && selected.length > 0 ? (
                   <div className="nc-chipBar">
                     <div className="nc-chipRow">
@@ -357,13 +370,7 @@ export default function NewChatPage() {
                         const id = safeId(c);
                         const label = safeLabel(c);
                         return (
-                          <button
-                            key={id}
-                            type="button"
-                            className="nc-chip"
-                            onClick={() => removePicked(id)}
-                            title="Remove"
-                          >
+                          <button key={id} type="button" className="nc-chip" onClick={() => removePicked(id)} title="Remove">
                             <span className="nc-chipAvatar">{initials(label)}</span>
                             <span className="nc-chipText">{label}</span>
                             <span className="nc-chipX">×</span>
@@ -399,7 +406,7 @@ export default function NewChatPage() {
                   <div className="nc-searchMeta">
                     <span>{loading ? 'Searching…' : `${items.length} result${items.length === 1 ? '' : 's'}`}</span>
                     <span className="nc-dot">•</span>
-                    <span>{mode === 'dm' ? 'Click to select' : 'Click to toggle'}</span>
+                    <span>{mode === 'dm' ? 'Select one' : 'Select multiple'}</span>
                   </div>
                 </div>
 
@@ -412,8 +419,9 @@ export default function NewChatPage() {
                     </div>
                   ) : items.length === 0 ? (
                     <div className="nc-empty">
+                      <div className="nc-emptyIcon">⌕</div>
                       <div className="nc-emptyTitle">No customers found</div>
-                      <div className="nc-emptySub">Try searching by mobile number or customer ID.</div>
+                      <div className="nc-emptySub">Try searching with mobile number or customer ID.</div>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -478,7 +486,7 @@ export default function NewChatPage() {
             )}
           </div>
 
-          {/* Right: preview panel (desktop only, but harmless) */}
+          {/* Right preview */}
           <div className="nc-right">
             <div className="nc-preview">
               <div className="nc-previewIcon">+</div>
@@ -487,7 +495,7 @@ export default function NewChatPage() {
               </div>
               <div className="nc-previewSub">
                 {mode === 'dm'
-                  ? 'Select one customer on the left and click Chat.'
+                  ? 'Select one customer and click Chat.'
                   : step === 'pick'
                     ? 'Select at least two customers, then click Next.'
                     : 'Enter a group subject and click Create.'}
@@ -497,7 +505,7 @@ export default function NewChatPage() {
                 <div className="nc-previewCard">
                   <div className="nc-miniLabel">Selected</div>
                   {dmSelected ? (
-                    <div className="nc-participantRow">
+                    <div className="nc-participantRow nc-participantCompact">
                       <div className="nc-avatar">{initials(safeLabel(dmSelected))}</div>
                       <div className="min-w-0 flex-1">
                         <div className="nc-rowTitle truncate">{safeLabel(dmSelected)}</div>
@@ -511,9 +519,7 @@ export default function NewChatPage() {
               ) : (
                 <div className="nc-previewCard">
                   <div className="nc-miniLabel">Participants</div>
-                  <div className="nc-muted">
-                    {selected.length < 1 ? 'No one selected.' : `${selected.length} selected.`}
-                  </div>
+                  <div className="nc-muted">{selected.length < 1 ? 'No one selected.' : `${selected.length} selected.`}</div>
                 </div>
               )}
             </div>
@@ -521,23 +527,26 @@ export default function NewChatPage() {
         </div>
 
         <style jsx global>{`
-          /* ===== page frame ===== */
           .nc-page {
             padding: 16px;
-            background: radial-gradient(circle at 12% 10%, rgba(59, 130, 246, 0.12), transparent 35%),
-              radial-gradient(circle at 85% 15%, rgba(16, 185, 129, 0.10), transparent 35%),
+            background:
+              radial-gradient(circle at 12% 10%, rgba(59, 130, 246, 0.14), transparent 35%),
+              radial-gradient(circle at 88% 18%, rgba(16, 185, 129, 0.12), transparent 38%),
+              radial-gradient(circle at 50% 110%, rgba(99, 102, 241, 0.10), transparent 45%),
               #f8fafc;
             min-height: calc(100vh - 0px);
+            letter-spacing: -0.01em;
           }
 
           .nc-shell {
-            max-width: 1100px;
+            max-width: 1120px;
             margin: 0 auto;
             border: 1px solid rgba(226, 232, 240, 1);
-            border-radius: 16px;
-            background: white;
-            box-shadow: 0 18px 55px rgba(2, 6, 23, 0.08);
+            border-radius: 18px;
+            background: rgba(255, 255, 255, 0.92);
+            box-shadow: 0 20px 60px rgba(2, 6, 23, 0.10);
             overflow: hidden;
+            backdrop-filter: blur(6px);
           }
 
           @media (prefers-reduced-motion: no-preference) {
@@ -587,6 +596,20 @@ export default function NewChatPage() {
                 background-position: -200% 0;
               }
             }
+
+            .nc-row {
+              animation: rowFade 220ms ease both;
+            }
+            @keyframes rowFade {
+              from {
+                opacity: 0;
+                transform: translateY(3px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
           }
 
           .nc-topbar {
@@ -604,7 +627,7 @@ export default function NewChatPage() {
             font-size: 11px;
             font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.10em;
           }
 
           .nc-titleRow {
@@ -616,10 +639,10 @@ export default function NewChatPage() {
           }
 
           .nc-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 900;
             color: rgba(15, 23, 42, 1);
-            letter-spacing: -0.02em;
+            letter-spacing: -0.03em;
             margin: 0;
           }
 
@@ -664,6 +687,7 @@ export default function NewChatPage() {
 
           .nc-segBtn:hover {
             background: rgba(241, 245, 249, 1);
+            transform: translateY(-1px);
           }
 
           .nc-segBtn.active {
@@ -674,7 +698,7 @@ export default function NewChatPage() {
           .nc-body {
             display: grid;
             grid-template-columns: 1fr 380px;
-            min-height: 620px;
+            min-height: 640px;
           }
 
           @media (max-width: 980px) {
@@ -699,13 +723,13 @@ export default function NewChatPage() {
 
           .nc-card {
             border: 1px solid rgba(226, 232, 240, 1);
-            border-radius: 16px;
+            border-radius: 18px;
             background: white;
             overflow: hidden;
-            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
+            box-shadow: 0 12px 28px rgba(2, 6, 23, 0.08);
             display: flex;
             flex-direction: column;
-            min-height: 592px;
+            min-height: 610px;
           }
 
           .nc-cardHeader {
@@ -717,6 +741,7 @@ export default function NewChatPage() {
           .nc-cardTitle {
             color: rgba(15, 23, 42, 1);
             font-weight: 900;
+            letter-spacing: -0.01em;
           }
 
           .nc-cardSub {
@@ -760,13 +785,14 @@ export default function NewChatPage() {
             font-size: 12px;
             font-weight: 800;
             color: rgba(30, 41, 59, 1);
-            transition: background 140ms ease, border-color 140ms ease;
+            transition: background 140ms ease, border-color 140ms ease, transform 140ms ease;
             white-space: nowrap;
           }
 
           .nc-chip:hover {
             border-color: rgba(59, 130, 246, 0.35);
             background: rgba(241, 245, 249, 1);
+            transform: translateY(-1px);
           }
 
           .nc-chipAvatar {
@@ -778,7 +804,7 @@ export default function NewChatPage() {
             justify-content: center;
             border: 1px solid rgba(59, 130, 246, 0.25);
             background: rgba(59, 130, 246, 0.10);
-            color: rgba(30, 41, 59, 1);
+            color: rgba(15, 23, 42, 1);
             font-weight: 900;
             font-size: 11px;
             flex: 0 0 auto;
@@ -800,23 +826,27 @@ export default function NewChatPage() {
             padding: 12px 14px 10px;
             border-bottom: 1px solid rgba(241, 245, 249, 1);
             background: rgba(255, 255, 255, 1);
+            position: sticky;
+            top: 0;
+            z-index: 10;
           }
 
           .nc-searchBox {
-            height: 40px;
-            border-radius: 12px;
+            height: 42px;
+            border-radius: 14px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(248, 250, 252, 1);
             display: flex;
             align-items: center;
             gap: 10px;
             padding: 0 10px;
-            transition: box-shadow 140ms ease, border-color 140ms ease;
+            transition: box-shadow 140ms ease, border-color 140ms ease, transform 140ms ease;
           }
 
           .nc-searchBox:focus-within {
             border-color: rgba(148, 163, 184, 1);
             box-shadow: 0 0 0 4px rgba(226, 232, 240, 1);
+            transform: translateY(-1px);
           }
 
           .nc-searchIcon {
@@ -826,7 +856,7 @@ export default function NewChatPage() {
 
           .nc-searchInput {
             flex: 1;
-            height: 36px;
+            height: 38px;
             outline: none;
             background: transparent;
             color: rgba(15, 23, 42, 1);
@@ -836,15 +866,15 @@ export default function NewChatPage() {
           }
 
           .nc-clear {
-            width: 28px;
-            height: 28px;
-            border-radius: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 12px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(255, 255, 255, 1);
             color: rgba(100, 116, 139, 1);
             font-size: 18px;
             font-weight: 900;
-            transition: background 140ms ease, color 140ms ease;
+            transition: background 140ms ease, color 140ms ease, transform 140ms ease;
           }
 
           .nc-clear:disabled {
@@ -854,6 +884,7 @@ export default function NewChatPage() {
           .nc-clear:not(:disabled):hover {
             background: rgba(241, 245, 249, 1);
             color: rgba(15, 23, 42, 1);
+            transform: translateY(-1px);
           }
 
           .nc-searchMeta {
@@ -884,11 +915,13 @@ export default function NewChatPage() {
             gap: 12px;
             padding: 12px 14px;
             background: white;
-            transition: background 120ms ease, transform 120ms ease;
+            transition: background 140ms ease, transform 140ms ease, box-shadow 140ms ease;
           }
 
           .nc-row:hover {
             background: rgba(248, 250, 252, 1);
+            transform: translateY(-1px);
+            box-shadow: inset 0 0 0 9999px rgba(59, 130, 246, 0.02);
           }
 
           .nc-row.active {
@@ -900,8 +933,8 @@ export default function NewChatPage() {
           }
 
           .nc-avatar {
-            width: 44px;
-            height: 44px;
+            width: 46px;
+            height: 46px;
             border-radius: 999px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(248, 250, 252, 1);
@@ -927,6 +960,7 @@ export default function NewChatPage() {
           .nc-rowTitle {
             font-weight: 900;
             color: rgba(15, 23, 42, 1);
+            letter-spacing: -0.01em;
           }
 
           .nc-rowSub {
@@ -937,7 +971,7 @@ export default function NewChatPage() {
           }
 
           .nc-rowRight {
-            width: 40px;
+            width: 44px;
             display: flex;
             justify-content: flex-end;
             flex: 0 0 auto;
@@ -954,11 +988,13 @@ export default function NewChatPage() {
             color: white;
             font-weight: 900;
             background: transparent;
+            transition: transform 140ms ease;
           }
 
           .nc-check.on {
             border-color: rgba(16, 185, 129, 1);
             background: rgba(16, 185, 129, 1);
+            transform: scale(1.03);
           }
 
           .nc-radio {
@@ -986,12 +1022,12 @@ export default function NewChatPage() {
             font-size: 11px;
             font-weight: 900;
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.10em;
             color: rgba(100, 116, 139, 1);
           }
 
           .nc-participants {
-            border-radius: 14px;
+            border-radius: 16px;
             border: 1px solid rgba(226, 232, 240, 1);
             overflow: hidden;
             background: rgba(248, 250, 252, 1);
@@ -1006,25 +1042,30 @@ export default function NewChatPage() {
             background: white;
           }
 
+          .nc-participantCompact {
+            border-top: none;
+          }
+
           .nc-participantRow:first-child {
             border-top: none;
           }
 
           .nc-iconBtn {
-            width: 34px;
-            height: 34px;
-            border-radius: 12px;
+            width: 36px;
+            height: 36px;
+            border-radius: 14px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(248, 250, 252, 1);
             color: rgba(100, 116, 139, 1);
             font-size: 18px;
             font-weight: 900;
-            transition: background 140ms ease, color 140ms ease;
+            transition: background 140ms ease, color 140ms ease, transform 140ms ease;
           }
 
           .nc-iconBtn:hover {
             background: rgba(241, 245, 249, 1);
             color: rgba(15, 23, 42, 1);
+            transform: translateY(-1px);
           }
 
           .nc-bottom {
@@ -1037,8 +1078,23 @@ export default function NewChatPage() {
           }
 
           .nc-empty {
-            padding: 28px 16px;
+            padding: 34px 18px;
             text-align: center;
+          }
+
+          .nc-emptyIcon {
+            width: 54px;
+            height: 54px;
+            border-radius: 999px;
+            margin: 0 auto 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.12);
+            border: 1px solid rgba(59, 130, 246, 0.20);
+            font-weight: 900;
+            color: rgba(15, 23, 42, 1);
+            font-size: 22px;
           }
 
           .nc-emptyTitle {
@@ -1055,10 +1111,10 @@ export default function NewChatPage() {
 
           .nc-preview {
             height: 100%;
-            border-radius: 16px;
+            border-radius: 18px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: white;
-            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.06);
+            box-shadow: 0 12px 28px rgba(2, 6, 23, 0.08);
             padding: 16px;
             display: flex;
             flex-direction: column;
@@ -1083,6 +1139,7 @@ export default function NewChatPage() {
             font-weight: 900;
             color: rgba(15, 23, 42, 1);
             margin-top: 2px;
+            letter-spacing: -0.01em;
           }
 
           .nc-previewSub {
@@ -1093,7 +1150,7 @@ export default function NewChatPage() {
 
           .nc-previewCard {
             margin-top: 10px;
-            border-radius: 14px;
+            border-radius: 16px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(248, 250, 252, 1);
             padding: 12px;
@@ -1118,11 +1175,12 @@ export default function NewChatPage() {
             min-width: 260px;
             max-width: min(520px, calc(100vw - 32px));
             padding: 10px 12px;
-            border-radius: 12px;
+            border-radius: 14px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: white;
             box-shadow: 0 18px 40px rgba(2, 6, 23, 0.16);
           }
+
           .nc-toastMsg {
             font-size: 13px;
             color: rgba(15, 23, 42, 1);
@@ -1130,20 +1188,24 @@ export default function NewChatPage() {
             flex: 1;
             font-weight: 700;
           }
+
           .nc-toastX {
-            width: 26px;
-            height: 26px;
-            border-radius: 8px;
+            width: 28px;
+            height: 28px;
+            border-radius: 10px;
             border: 1px solid rgba(226, 232, 240, 1);
             background: rgba(248, 250, 252, 1);
             color: rgba(100, 116, 139, 1);
+            font-weight: 900;
           }
+
           .nc-toastDot {
             width: 10px;
             height: 10px;
             border-radius: 999px;
             background: rgba(148, 163, 184, 1);
           }
+
           .nc-toast-success .nc-toastDot {
             background: rgba(16, 185, 129, 1);
           }
