@@ -102,9 +102,12 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
 
   return (
     <aside
-      className={`flex h-screen flex-col border-r border-slate-200 bg-slate-900 text-slate-100 transition-all duration-300 ${
-        collapsed ? 'w-16' : 'w-64'
-      }`}
+      className={[
+        'flex h-screen flex-col bg-slate-900 text-slate-100 transition-all duration-300',
+        // FIX: subtle border on dark bg (prevents bright vertical line)
+        'border-r border-white/10',
+        collapsed ? 'w-16' : 'w-64',
+      ].join(' ')}
     >
       {/* Top: logo / app name */}
       <div className="flex items-center gap-2 px-3 py-3">
@@ -112,9 +115,10 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
           ADK
         </div>
         <div
-          className={`overflow-hidden text-sm font-semibold tracking-tight transition-opacity duration-200 ${
-            collapsed ? 'w-0 opacity-0' : 'opacity-100'
-          }`}
+          className={[
+            'overflow-hidden text-sm font-semibold tracking-tight transition-opacity duration-200',
+            collapsed ? 'w-0 opacity-0' : 'opacity-100',
+          ].join(' ')}
         >
           ADK System
         </div>
@@ -129,20 +133,21 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition-colors ${
-                active
-                  ? 'bg-slate-800 text-white'
-                  : 'text-slate-200 hover:bg-slate-800/70 hover:text-white'
-              }`}
+              className={[
+                'flex items-center gap-2 rounded-md px-2 py-2 text-xs font-medium transition-colors',
+                active ? 'bg-slate-800 text-white' : 'text-slate-200 hover:bg-slate-800/70 hover:text-white',
+              ].join(' ')}
             >
               {/* Simple initial as icon placeholder */}
               <span className="flex h-6 w-6 items-center justify-center rounded-md bg-slate-800 text-[11px] font-semibold uppercase">
                 {item.title.charAt(0)}
               </span>
+
               <span
-                className={`truncate transition-opacity duration-200 ${
-                  collapsed ? 'w-0 opacity-0' : 'opacity-100'
-                }`}
+                className={[
+                  'truncate transition-opacity duration-200',
+                  collapsed ? 'w-0 opacity-0' : 'opacity-100',
+                ].join(' ')}
               >
                 {item.title}
               </span>
@@ -160,10 +165,11 @@ export default function Sidebar({ collapsed = false }: SidebarProps) {
               <div className="truncate text-[10px] capitalize text-slate-400">{role || 'user'}</div>
             </div>
           )}
+
           <button
             type="button"
             onClick={handleLogout}
-            className="ml-auto inline-flex items-center justify-center rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-100 hover:bg-red-600 hover:text-white transition-colors"
+            className="ml-auto inline-flex items-center justify-center rounded-md bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-100 transition-colors hover:bg-red-600 hover:text-white"
           >
             Logout
           </button>
